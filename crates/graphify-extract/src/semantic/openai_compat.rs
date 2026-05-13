@@ -98,10 +98,7 @@ pub async fn extract_openai_compatible(
     if response.status().as_u16() == 404 {
         match provider {
             LLMProvider::Ollama => {
-                anyhow::bail!(
-                    "Model '{}' not found. Run: ollama pull {}",
-                    model, model
-                );
+                anyhow::bail!("Model '{}' not found. Run: ollama pull {}", model, model);
             }
             LLMProvider::OpenAI => {
                 anyhow::bail!(
@@ -112,7 +109,8 @@ pub async fn extract_openai_compatible(
             _ => {
                 anyhow::bail!(
                     "Model '{}' not found at {}. Check that the model is available.",
-                    model, base_url
+                    model,
+                    base_url
                 );
             }
         }

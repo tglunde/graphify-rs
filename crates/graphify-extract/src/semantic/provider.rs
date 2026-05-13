@@ -64,9 +64,7 @@ impl LLMProviderConfig {
                     (Some(k.clone()), AuthType::ApiKey)
                 } else if let Ok(k) = std::env::var("ANTHROPIC_API_KEY") {
                     (Some(k), AuthType::ApiKey)
-                } else if let Some(token) =
-                    super::anthropic_oauth::read_claude_code_oauth_token()
-                {
+                } else if let Some(token) = super::anthropic_oauth::read_claude_code_oauth_token() {
                     (Some(token), AuthType::Bearer)
                 } else {
                     (None, AuthType::ApiKey)
@@ -97,12 +95,9 @@ impl LLMProviderConfig {
             }
             LLMProvider::OpenAICompatible => {
                 let key = raw.openai_compatible_api_key.clone();
-                let url = raw
-                    .openai_compatible_base_url
-                    .clone()
-                    .context(
-                        "openai_compatible_base_url is required for openai_compatible provider",
-                    )?;
+                let url = raw.openai_compatible_base_url.clone().context(
+                    "openai_compatible_base_url is required for openai_compatible provider",
+                )?;
                 (key, url, AuthType::Bearer)
             }
         };
@@ -133,13 +128,13 @@ mod tests {
     fn resolve_anthropic_with_api_key() {
         let r = LLMConfigRaw {
             provider: "anthropic".into(),
-            model: "claude-sonnet-4-20250514".into(),
+            model: "claude-sonnet-4.6".into(),
             anthropic_api_key: Some("sk-test-key".into()),
             ..Default::default()
         };
         let config = LLMProviderConfig::resolve(&r).unwrap();
         assert_eq!(config.provider, LLMProvider::Anthropic);
-        assert_eq!(config.model, "claude-sonnet-4-20250514");
+        assert_eq!(config.model, "claude-sonnet-4.6");
         assert_eq!(config.api_key.as_deref(), Some("sk-test-key"));
         assert_eq!(config.base_url, "https://api.anthropic.com");
         assert_eq!(config.auth_type, AuthType::ApiKey);
@@ -172,7 +167,12 @@ mod tests {
     fn resolve_openai_compatible_requires_base_url() {
         let result = LLMProviderConfig::resolve(&raw("openai_compatible", "my-model"));
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("openai_compatible_base_url"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("openai_compatible_base_url")
+        );
     }
 
     #[test]
@@ -194,13 +194,23 @@ mod tests {
     fn reject_unknown_provider() {
         let result = LLMProviderConfig::resolve(&raw("unknown", "model"));
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unknown LLM provider"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unknown LLM provider")
+        );
     }
 
     #[test]
     fn reject_empty_model() {
         let result = LLMProviderConfig::resolve(&raw("anthropic", ""));
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("model is required"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("model is required")
+        );
     }
 }

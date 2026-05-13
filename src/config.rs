@@ -88,7 +88,10 @@ ollama_base_url = "http://localhost:11434"
         let llm = cfg.llm.as_ref().expect("llm config should be present");
         assert_eq!(llm.provider.as_deref(), Some("ollama"));
         assert_eq!(llm.model.as_deref(), Some("llama3"));
-        assert_eq!(llm.ollama_base_url.as_deref(), Some("http://localhost:11434"));
+        assert_eq!(
+            llm.ollama_base_url.as_deref(),
+            Some("http://localhost:11434")
+        );
     }
 
     #[test]
@@ -96,7 +99,7 @@ ollama_base_url = "http://localhost:11434"
         let toml_str = r#"
 [llm]
 provider = "anthropic"
-model = "claude-sonnet-4-20250514"
+model = "claude-sonnet-4.6"
 anthropic_api_key = "sk-test"
 "#;
         let cfg: Config = toml::from_str(toml_str).unwrap();

@@ -87,7 +87,9 @@ pub async fn extract_anthropic(
         let body = response.text().await.unwrap_or_default();
         anyhow::bail!(
             "Model '{}' not found. Check available models at docs.anthropic.com\nAPI returned {}: {}",
-            config.model, status, body
+            config.model,
+            status,
+            body
         );
     }
 

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Support multiple LLM providers for semantic extraction: Anthropic (with Claude Code OAuth), OpenAI, Ollama, and OpenAI-compatible endpoints (vLLM, LM Studio, etc.)
+- `[llm]` configuration section in `graphify.toml` for provider, model, API keys, and base URLs
+- Claude Code OAuth token reuse — automatically reads from `~/.claude/config.json` with expiry checking
+- Provider-specific error messages (e.g., `ollama pull` hint on model not found)
+
+### Changed
+- Semantic extraction now shows provider name and model in build output
+- `ANTHROPIC_API_KEY` env var remains as backward-compatible fallback when `[llm]` config is absent
+- `graphify-extract` crate description updated to reflect multi-provider support
+
 ## [0.4.5] - 2026-04-25
 
 ### Fixed

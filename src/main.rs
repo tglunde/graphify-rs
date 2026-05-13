@@ -645,12 +645,7 @@ async fn cmd_build(
             ) {
                 Ok(c) => Some(c),
                 Err(e) => {
-                    info_print!(
-                        verb,
-                        "  {} Invalid [llm] config: {}",
-                        "⚠".yellow(),
-                        e
-                    );
+                    info_print!(verb, "  {} Invalid [llm] config: {}", "⚠".yellow(), e);
                     None
                 }
             }
@@ -660,7 +655,7 @@ async fn cmd_build(
                 graphify_extract::semantic::LLMProviderConfig::resolve(
                     &graphify_extract::semantic::LLMConfigRaw {
                         provider: "anthropic".into(),
-                        model: "claude-sonnet-4-20250514".into(),
+                        model: "claude-sonnet-4.6".into(),
                         anthropic_api_key: Some(key),
                         ..Default::default()
                     },
@@ -683,7 +678,9 @@ async fn cmd_build(
                     graphify_extract::semantic::LLMProvider::Anthropic => "Anthropic",
                     graphify_extract::semantic::LLMProvider::OpenAI => "OpenAI",
                     graphify_extract::semantic::LLMProvider::Ollama => "Ollama",
-                    graphify_extract::semantic::LLMProvider::OpenAICompatible => "OpenAI-compatible",
+                    graphify_extract::semantic::LLMProvider::OpenAICompatible => {
+                        "OpenAI-compatible"
+                    }
                 };
                 info_print!(
                     verb,
@@ -1288,7 +1285,7 @@ fn cmd_init() -> Result<()> {
 # LLM provider for semantic extraction
 # [llm]
 # provider = "anthropic"          # anthropic | openai | ollama | openai_compatible
-# model = "claude-sonnet-4-20250514"  # required, no default
+# model = "claude-sonnet-4.6"  # required, no default
 # anthropic_api_key = "sk-..."    # optional, falls back to ANTHROPIC_API_KEY env or Claude Code OAuth
 # anthropic_base_url = "https://api.anthropic.com"  # optional override
 # openai_api_key = "sk-..."       # optional, falls back to OPENAI_API_KEY env

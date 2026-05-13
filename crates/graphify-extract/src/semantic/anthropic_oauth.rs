@@ -40,7 +40,13 @@ fn read_token_from_file(path: &std::path::Path) -> Option<String> {
     }
 
     // Try common field names for OAuth access tokens
-    for field in &["accessToken", "access_token", "oauthToken", "apiKey", "token"] {
+    for field in &[
+        "accessToken",
+        "access_token",
+        "oauthToken",
+        "apiKey",
+        "token",
+    ] {
         if let Some(val) = json
             .get(*field)
             .and_then(|v| v.as_str())
