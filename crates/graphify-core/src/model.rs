@@ -30,6 +30,10 @@ pub enum NodeType {
     Variable,
     Package,
     Namespace,
+    Application,
+    Relation,
+    Column,
+    Expression,
 }
 
 // ---------------------------------------------------------------------------
@@ -243,6 +247,22 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&NodeType::Namespace).unwrap(),
             r#""namespace""#
+        );
+        assert_eq!(
+            serde_json::to_string(&NodeType::Application).unwrap(),
+            r#""application""#
+        );
+        assert_eq!(
+            serde_json::to_string(&NodeType::Relation).unwrap(),
+            r#""relation""#
+        );
+        assert_eq!(
+            serde_json::to_string(&NodeType::Column).unwrap(),
+            r#""column""#
+        );
+        assert_eq!(
+            serde_json::to_string(&NodeType::Expression).unwrap(),
+            r#""expression""#
         );
     }
 

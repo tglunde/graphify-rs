@@ -1,4 +1,12 @@
 //! Integration tests for regex-based AST extraction across all supported languages.
+//!
+//! Language Coverage Note:
+//! - Most languages (Python, Rust, JS/TS, Go, Java, C/C++, C#, etc.) are tested below
+//!   using the generic extract_file() API
+//! - SQL extraction has comprehensive unit tests in `src/sql.rs` (test_extract_sql_*)
+//!   and is integration-tested below for routing verification only
+//! - DBT extraction has unit tests in `src/dbt.rs` requiring mock dbt project setup
+//!   (integration testing requires external dbt CLI dependency)
 
 use graphify_core::confidence::Confidence;
 use graphify_core::model::NodeType;
@@ -753,4 +761,201 @@ fn all_edges_have_source_file() {
     for edge in &result.edges {
         assert!(!edge.source_file.is_empty());
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SQL
+// ═══════════════════════════════════════════════════════════════════════════
+// NOTE: Comprehensive SQL extraction tests (relation extraction, FK detection,
+// column lineage, etc.) are in crates/graphify-extract/src/sql.rs as unit tests.
+// These integration tests verify the routing through the main extract() pipeline.
+
+#[test]
+fn sql_routes_through_extract_pipeline() {
+    use graphify_extract::extract;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let sql_path = temp_dir.path().join("test.sql");
+    std::fs::write(&sql_path, "CREATE TABLE test_table (id INT PRIMARY KEY);").unwrap();
+
+    let paths = vec![sql_path];
+    let result = extract(&paths);
+
+    assert!(
+        !result.nodes.is_empty(),
+        "SQL extraction should produce nodes"
+    );
+    assert!(
+        result
+            .nodes
+            .iter()
+            .any(|n| n.node_type == NodeType::Relation),
+        "SQL should produce Relation nodes"
+    );
+}
+
+/// D1 — Full multi-statement plain SQL integration test.
+///
+/// Verifies that extracting a realistic EXASOL-style SQL file containing
+/// `CREATE TABLE`, `ALTER TABLE … ADD FOREIGN KEY`, and `CREATE VIEW … JOIN`
+/// produces the complete expected graph: Relation nodes, an Application node,
+/// `defines` / `part_of` edges, a `references` FK edge, `depends_on` edges
+/// from the view, and Column nodes with `derives_from` edges.
+#[test]
+fn sql_full_multi_statement_integration() {
+    use graphify_extract::extract;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let sql_path = temp_dir.path().join("schema.sql");
+    let sql = "\
+CREATE TABLE staging.orders (id INT PRIMARY KEY, customer_id INT);\n\
+CREATE TABLE staging.customers (id INT PRIMARY KEY, name VARCHAR(100));\n\
+ALTER TABLE staging.orders ADD FOREIGN KEY (customer_id) REFERENCES staging.customers(id);\n\
+CREATE VIEW reporting.order_summary AS\n\
+  SELECT o.id, c.name\n\
+  FROM staging.orders o\n\
+  JOIN staging.customers c ON o.customer_id = c.id;\n";
+    std::fs::write(&sql_path, sql).unwrap();
+
+    let result = extract(&[sql_path]);
+
+    // ── 3 Relation nodes ──────────────────────────────────────────────────
+    let orders = result
+        .nodes
+        .iter()
+        .find(|n| n.node_type == NodeType::Relation && n.label == "staging.orders");
+    let customers = result
+        .nodes
+        .iter()
+        .find(|n| n.node_type == NodeType::Relation && n.label == "staging.customers");
+    let summary = result
+        .nodes
+        .iter()
+        .find(|n| n.node_type == NodeType::Relation && n.label == "reporting.order_summary");
+
+    assert!(orders.is_some(), "staging.orders Relation should exist");
+    assert!(
+        customers.is_some(),
+        "staging.customers Relation should exist"
+    );
+    assert!(
+        summary.is_some(),
+        "reporting.order_summary Relation should exist"
+    );
+
+    let orders_id = &orders.unwrap().id;
+    let customers_id = &customers.unwrap().id;
+    let summary_id = &summary.unwrap().id;
+
+    // ── 1 Application node ────────────────────────────────────────────────
+    let app_node = result
+        .nodes
+        .iter()
+        .find(|n| n.node_type == NodeType::Application);
+    assert!(app_node.is_some(), "should have an Application node");
+    let app_id = &app_node.unwrap().id;
+
+    // ── `defines` edges: File → each Relation ─────────────────────────────
+    let file_node = result.nodes.iter().find(|n| n.node_type == NodeType::File);
+    assert!(file_node.is_some(), "File node should exist");
+    let file_id = &file_node.unwrap().id;
+
+    assert!(
+        result
+            .edges
+            .iter()
+            .any(|e| e.relation == "defines" && &e.source == file_id && &e.target == orders_id),
+        "File should have a 'defines' edge to staging.orders"
+    );
+    assert!(
+        result
+            .edges
+            .iter()
+            .any(|e| e.relation == "defines" && &e.source == file_id && &e.target == customers_id),
+        "File should have a 'defines' edge to staging.customers"
+    );
+    assert!(
+        result
+            .edges
+            .iter()
+            .any(|e| e.relation == "defines" && &e.source == file_id && &e.target == summary_id),
+        "File should have a 'defines' edge to reporting.order_summary"
+    );
+
+    // ── `references` edge: staging.orders FK → staging.customers ──────────
+    assert!(
+        result.edges.iter().any(|e| {
+            e.relation == "references" && &e.source == orders_id && &e.target == customers_id
+        }),
+        "staging.orders should have a 'references' edge to staging.customers (via FK)"
+    );
+
+    // ── `depends_on` edges: order_summary → orders and customers ──────────
+    assert!(
+        result.edges.iter().any(|e| {
+            e.relation == "depends_on" && &e.source == summary_id && &e.target == orders_id
+        }),
+        "reporting.order_summary should have a 'depends_on' edge to staging.orders"
+    );
+    assert!(
+        result.edges.iter().any(|e| {
+            e.relation == "depends_on" && &e.source == summary_id && &e.target == customers_id
+        }),
+        "reporting.order_summary should have a 'depends_on' edge to staging.customers"
+    );
+
+    // ── `part_of` edges: each Relation → Application ──────────────────────
+    assert!(
+        result
+            .edges
+            .iter()
+            .any(|e| e.relation == "part_of" && &e.source == orders_id && &e.target == app_id),
+        "staging.orders should be 'part_of' the Application"
+    );
+    assert!(
+        result
+            .edges
+            .iter()
+            .any(|e| e.relation == "part_of" && &e.source == customers_id && &e.target == app_id),
+        "staging.customers should be 'part_of' the Application"
+    );
+    assert!(
+        result
+            .edges
+            .iter()
+            .any(|e| e.relation == "part_of" && &e.source == summary_id && &e.target == app_id),
+        "reporting.order_summary should be 'part_of' the Application"
+    );
+
+    // ── Column/Expression nodes on the view with `derives_from` edges ─────
+    //
+    // The view selects `o.id` (alias o → staging.orders) and `c.name`
+    // (alias c → staging.customers).  Both are plain field references and
+    // should yield Column nodes whose `derives_from` edges point back to
+    // the source relation's columns.
+    let view_col_nodes: Vec<_> = result
+        .nodes
+        .iter()
+        .filter(|n| {
+            (n.node_type == NodeType::Column || n.node_type == NodeType::Expression)
+                && result
+                    .edges
+                    .iter()
+                    .any(|e| e.relation == "part_of" && e.source == n.id && &e.target == summary_id)
+        })
+        .collect();
+    assert!(
+        !view_col_nodes.is_empty(),
+        "reporting.order_summary should have Column or Expression nodes"
+    );
+
+    let view_col_ids: std::collections::HashSet<&str> =
+        view_col_nodes.iter().map(|n| n.id.as_str()).collect();
+    assert!(
+        result
+            .edges
+            .iter()
+            .any(|e| { e.relation == "derives_from" && view_col_ids.contains(e.source.as_str()) }),
+        "view Column nodes should have 'derives_from' edges to their source columns"
+    );
 }

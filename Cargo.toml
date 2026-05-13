@@ -1,20 +1,20 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/graphify-core",
-    "crates/graphify-detect",
-    "crates/graphify-extract",
-    "crates/graphify-build",
-    "crates/graphify-cluster",
-    "crates/graphify-analyze",
-    "crates/graphify-export",
-    "crates/graphify-cache",
-    "crates/graphify-security",
-    "crates/graphify-ingest",
-    "crates/graphify-serve",
-    "crates/graphify-watch",
-    "crates/graphify-hooks",
-    "crates/graphify-benchmark",
+  "crates/graphify-core",
+  "crates/graphify-detect",
+  "crates/graphify-extract",
+  "crates/graphify-build",
+  "crates/graphify-cluster",
+  "crates/graphify-analyze",
+  "crates/graphify-export",
+  "crates/graphify-cache",
+  "crates/graphify-security",
+  "crates/graphify-ingest",
+  "crates/graphify-serve",
+  "crates/graphify-watch",
+  "crates/graphify-hooks",
+  "crates/graphify-benchmark",
 ]
 
 [workspace.package]
@@ -31,7 +31,15 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # Async
-tokio = { version = "1", features = ["rt-multi-thread", "fs", "net", "io-util", "macros", "sync", "time"] }
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "fs",
+  "net",
+  "io-util",
+  "macros",
+  "sync",
+  "time",
+] }
 
 # HTTP
 reqwest = { version = "0.12", features = ["json"] }
@@ -49,6 +57,12 @@ thiserror = "2"
 
 # Regex
 regex = "1"
+
+# File system walking
+walkdir = "2"
+
+# YAML
+serde_yaml = "0.9"
 
 # SHA256
 sha2 = "0.10"
@@ -86,12 +100,12 @@ readme = "README.md"
 keywords = ["knowledge-graph", "code-analysis", "ast", "tree-sitter", "mcp"]
 categories = ["command-line-utilities", "development-tools"]
 exclude = [
-    ".github/",
-    "tests/",
-    "graphify-out/",
-    "graphify.toml",
-    "README_CN.md",
-    "AUDIT_*.md",
+  ".github/",
+  "tests/",
+  "graphify-out/",
+  "graphify.toml",
+  "README_CN.md",
+  "AUDIT_*.md",
 ]
 
 [[bin]]

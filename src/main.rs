@@ -507,11 +507,23 @@ async fn cmd_build(
         );
     }
 
+    // ── Step 1b: Detect dbt projects ──
+    let dbt_projects = graphify_detect::detect_dbt_projects(&root);
+    let mut dbt_managed_paths = std::collections::HashSet::new();
+    for project in &dbt_projects {
+        dbt_managed_paths.extend(project.managed_sql_paths.iter().cloned());
+    }
+
     // ── Step 2: Extract AST (Pass 1 — deterministic, with per-file cache) ──
     let code_files: Vec<PathBuf> = detection
         .files
         .get(&graphify_detect::FileType::Code)
-        .map(|v| v.iter().map(|f| root.join(f)).collect())
+        .map(|v| {
+            v.iter()
+                .map(|f| root.join(f))
+                .filter(|p| !dbt_managed_paths.contains(p))
+                .collect()
+        })
         .unwrap_or_default();
 
     if code_files.is_empty() && code_only {
@@ -594,6 +606,20 @@ async fn cmd_build(
 
     if let Some(pb) = pb {
         pb.finish_and_clear();
+    }
+
+    // ── Step 2b: Extract dbt projects ──
+    if !dbt_projects.is_empty() {
+        info_print!(
+            verb,
+            "  {} dbt from {} project(s)...",
+            "Extracting".cyan(),
+            dbt_projects.len()
+        );
+        let dbt_result = graphify_extract::dbt::extract_dbt_projects(&dbt_projects);
+        ast_result.nodes.extend(dbt_result.nodes);
+        ast_result.edges.extend(dbt_result.edges);
+        ast_result.hyperedges.extend(dbt_result.hyperedges);
     }
     let cache_hits = cache_hits.load(Ordering::Relaxed);
     let extract_errors = extract_errors.load(Ordering::Relaxed);
