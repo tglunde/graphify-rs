@@ -1,10 +1,13 @@
-//! Semantic extraction via Claude API (Pass 2).
+//! Semantic extraction via LLM APIs (Pass 2).
 //!
-//! Extracts higher-level concepts and relationships from documents, papers, and
-//! images using the Anthropic Messages API. This is the second pass of the
-//! extraction pipeline — it complements the deterministic AST extraction from
-//! Pass 1 by discovering semantic relationships that cannot be inferred from
-//! syntax alone.
+//! Supports multiple LLM providers through a dual-path architecture:
+//! - Anthropic (Messages API + OAuth token support)
+//! - OpenAI-compatible (Chat Completions API: OpenAI, Ollama, vLLM, etc.)
+
+pub mod anthropic;
+pub mod anthropic_oauth;
+pub mod openai_compat;
+pub mod provider;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -13,36 +16,13 @@ use anyhow::{Context, Result};
 use graphify_core::confidence::Confidence;
 use graphify_core::id::make_id;
 use graphify_core::model::{ExtractionResult, GraphEdge, GraphNode, NodeType};
-use serde::{Deserialize, Serialize};
-use tracing::debug;
+use serde::Deserialize;
+
+pub use provider::{AuthType, LLMConfigRaw, LLMProvider, LLMProviderConfig};
 
 // ---------------------------------------------------------------------------
-// Claude API request/response types
+// Shared response types
 // ---------------------------------------------------------------------------
-
-#[derive(Serialize)]
-struct MessageRequest {
-    model: String,
-    max_tokens: u32,
-    messages: Vec<Message>,
-    system: String,
-}
-
-#[derive(Serialize)]
-struct Message {
-    role: String,
-    content: String,
-}
-
-#[derive(Deserialize)]
-struct MessageResponse {
-    content: Vec<ContentBlock>,
-}
-
-#[derive(Deserialize)]
-struct ContentBlock {
-    text: Option<String>,
-}
 
 /// Entities and relationships extracted by the LLM.
 #[derive(Deserialize, Debug)]
@@ -80,71 +60,36 @@ fn default_relation() -> String {
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Extract semantic concepts from a document, paper, or image using the Claude API.
+/// Extract semantic concepts from a document, paper, or image using an LLM.
 ///
-/// # Arguments
-/// * `path` — the file path (used for source_file metadata)
-/// * `content` — the text content to analyse
-/// * `file_type` — one of `"document"`, `"paper"`, or `"image"`
-/// * `api_key` — Anthropic API key
-///
-/// # Errors
-/// Returns an error if the HTTP request fails or the response cannot be parsed.
+/// Dispatches to the appropriate provider based on `config.provider`.
 pub async fn extract_semantic(
     path: &Path,
     content: &str,
     file_type: &str,
-    api_key: &str,
+    config: &LLMProviderConfig,
 ) -> Result<ExtractionResult> {
-    let file_str = path.to_string_lossy();
-    let system_prompt = build_system_prompt(file_type);
-    let user_prompt = build_user_prompt(content, file_type);
-
-    debug!("sending semantic extraction request for {}", file_str);
-
-    let request_body = MessageRequest {
-        model: "claude-sonnet-4-20250514".to_string(),
-        max_tokens: 4096,
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: user_prompt,
-        }],
-        system: system_prompt,
-    };
-
-    let client = reqwest::Client::new();
-    let response = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&request_body)
-        .send()
-        .await
-        .context("failed to send request to Claude API")?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        anyhow::bail!("Claude API returned {status}: {body}");
+    match config.provider {
+        LLMProvider::Anthropic => {
+            anthropic::extract_anthropic(path, content, file_type, config).await
+        }
+        LLMProvider::OpenAI | LLMProvider::Ollama | LLMProvider::OpenAICompatible => {
+            openai_compat::extract_openai_compatible(
+                path,
+                content,
+                file_type,
+                config.provider.clone(),
+                &config.model,
+                config.api_key.as_deref(),
+                &config.base_url,
+            )
+            .await
+        }
     }
-
-    let msg: MessageResponse = response
-        .json()
-        .await
-        .context("failed to parse Claude API response")?;
-
-    let text = msg
-        .content
-        .first()
-        .and_then(|b| b.text.as_deref())
-        .unwrap_or("{}");
-
-    parse_semantic_response(text, &file_str)
 }
 
 // ---------------------------------------------------------------------------
-// Prompt construction
+// Prompt construction (shared)
 // ---------------------------------------------------------------------------
 
 fn build_system_prompt(file_type: &str) -> String {
@@ -160,7 +105,6 @@ fn build_system_prompt(file_type: &str) -> String {
 }
 
 fn build_user_prompt(content: &str, file_type: &str) -> String {
-    // Truncate very long content
     let max_chars = 100_000;
     let truncated = if content.len() > max_chars {
         let mut end = max_chars;
@@ -176,11 +120,10 @@ fn build_user_prompt(content: &str, file_type: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Response parsing
+// Response parsing (shared)
 // ---------------------------------------------------------------------------
 
 fn parse_semantic_response(text: &str, file_str: &str) -> Result<ExtractionResult> {
-    // Try to find JSON in the response (might be wrapped in markdown fences)
     let json_str = extract_json_block(text);
 
     let output: SemanticOutput =
@@ -189,7 +132,6 @@ fn parse_semantic_response(text: &str, file_str: &str) -> Result<ExtractionResul
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
 
-    // Convert entities to nodes
     let mut name_to_id: HashMap<String, String> = HashMap::new();
     for entity in &output.entities {
         let id = make_id(&[file_str, &entity.name]);
@@ -213,7 +155,6 @@ fn parse_semantic_response(text: &str, file_str: &str) -> Result<ExtractionResul
         });
     }
 
-    // Convert relationships to edges
     for rel in &output.relationships {
         let source_id = name_to_id
             .get(&rel.source)
@@ -246,21 +187,18 @@ fn parse_semantic_response(text: &str, file_str: &str) -> Result<ExtractionResul
 
 /// Extract a JSON block from text that might be wrapped in markdown fences.
 fn extract_json_block(text: &str) -> &str {
-    // Try to find ```json ... ``` block
     if let Some(start) = text.find("```json") {
         let after = &text[start + 7..];
         if let Some(end) = after.find("```") {
             return after[..end].trim();
         }
     }
-    // Try to find ``` ... ``` block
     if let Some(start) = text.find("```") {
         let after = &text[start + 3..];
         if let Some(end) = after.find("```") {
             return after[..end].trim();
         }
     }
-    // Try to find { ... } directly
     if let Some(start) = text.find('{')
         && let Some(end) = text.rfind('}')
     {
@@ -270,7 +208,7 @@ fn extract_json_block(text: &str) -> &str {
 }
 
 // ---------------------------------------------------------------------------
-// Tests
+// Tests (shared parsing logic)
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -294,12 +232,7 @@ mod tests {
         let result = parse_semantic_response(json, "paper.pdf").unwrap();
         assert_eq!(result.nodes.len(), 3);
         assert_eq!(result.edges.len(), 2);
-        assert!(
-            result
-                .nodes
-                .iter()
-                .all(|n| n.node_type == NodeType::Concept)
-        );
+        assert!(result.nodes.iter().all(|n| n.node_type == NodeType::Concept));
         assert_eq!(result.edges[0].relation, "is_a");
     }
 

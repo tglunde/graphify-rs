@@ -703,6 +703,7 @@ name = "graphify-extract"
 version = "0.4.5"
 dependencies = [
  "anyhow",
+ "dirs",
  "graphify-cache",
  "graphify-core",
  "graphify-security",
@@ -711,6 +712,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",

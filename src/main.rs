@@ -282,17 +282,17 @@ async fn main() -> Result<()> {
             max_viz_nodes,
         } => {
             // Merge config file defaults with CLI args
-            let cfg = config::load_config(Path::new(&path));
+            let app_cfg = config::load_config(Path::new(&path));
             let effective_path = path;
             let effective_output = if output == "graphify-out" {
-                cfg.output.unwrap_or(output)
+                app_cfg.output.unwrap_or(output)
             } else {
                 output
             };
-            let effective_no_llm = no_llm || cfg.no_llm.unwrap_or(false);
-            let effective_code_only = code_only || cfg.code_only.unwrap_or(false);
+            let effective_no_llm = no_llm || app_cfg.no_llm.unwrap_or(false);
+            let effective_code_only = code_only || app_cfg.code_only.unwrap_or(false);
             let effective_formats = if format.is_empty() {
-                cfg.formats.unwrap_or_default()
+                app_cfg.formats.unwrap_or_default()
             } else {
                 format
             };
@@ -307,6 +307,7 @@ async fn main() -> Result<()> {
                 verb,
                 cli.jobs,
                 max_viz_nodes,
+                app_cfg.llm,
             )
             .await?;
         }
@@ -445,6 +446,7 @@ async fn cmd_build(
     verb: Verbosity,
     jobs: Option<usize>,
     max_viz_nodes: Option<usize>,
+    llm_config: Option<config::LLMConfig>,
 ) -> Result<()> {
     let root = PathBuf::from(path);
     let output_dir = PathBuf::from(output);
@@ -622,10 +624,52 @@ async fn cmd_build(
 
     let mut extractions = vec![ast_result];
 
-    // ── Step 2b: Semantic extraction (Pass 2 — Claude API, concurrent) ──
+    // ── Step 2b: Semantic extraction (Pass 2 — LLM API, concurrent) ──
     if !no_llm && !code_only {
-        let api_key = std::env::var("ANTHROPIC_API_KEY").ok();
-        if let Some(key) = api_key {
+        let provider_config = if let Some(ref llm) = llm_config {
+            // Config-based resolution
+            let provider = llm.provider.as_deref().unwrap_or("");
+            let model = llm.model.as_deref().unwrap_or("");
+            match graphify_extract::semantic::LLMProviderConfig::resolve(
+                &graphify_extract::semantic::LLMConfigRaw {
+                    provider: provider.to_string(),
+                    model: model.to_string(),
+                    anthropic_api_key: llm.anthropic_api_key.clone(),
+                    anthropic_base_url: llm.anthropic_base_url.clone(),
+                    openai_api_key: llm.openai_api_key.clone(),
+                    openai_base_url: llm.openai_base_url.clone(),
+                    ollama_base_url: llm.ollama_base_url.clone(),
+                    openai_compatible_api_key: llm.openai_compatible_api_key.clone(),
+                    openai_compatible_base_url: llm.openai_compatible_base_url.clone(),
+                },
+            ) {
+                Ok(c) => Some(c),
+                Err(e) => {
+                    info_print!(
+                        verb,
+                        "  {} Invalid [llm] config: {}",
+                        "⚠".yellow(),
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            // Backward compat: ANTHROPIC_API_KEY env var → Anthropic provider
+            std::env::var("ANTHROPIC_API_KEY").ok().map(|key| {
+                graphify_extract::semantic::LLMProviderConfig::resolve(
+                    &graphify_extract::semantic::LLMConfigRaw {
+                        provider: "anthropic".into(),
+                        model: "claude-sonnet-4-20250514".into(),
+                        anthropic_api_key: Some(key),
+                        ..Default::default()
+                    },
+                )
+                .expect("hardcoded anthropic config should always resolve")
+            })
+        };
+
+        if let Some(config) = provider_config {
             let doc_files: Vec<PathBuf> = detection
                 .files
                 .get(&graphify_detect::FileType::Document)
@@ -635,11 +679,19 @@ async fn cmd_build(
                 .collect();
 
             if !doc_files.is_empty() {
+                let provider_name = match config.provider {
+                    graphify_extract::semantic::LLMProvider::Anthropic => "Anthropic",
+                    graphify_extract::semantic::LLMProvider::OpenAI => "OpenAI",
+                    graphify_extract::semantic::LLMProvider::Ollama => "Ollama",
+                    graphify_extract::semantic::LLMProvider::OpenAICompatible => "OpenAI-compatible",
+                };
                 info_print!(
                     verb,
-                    "  {} on {} doc/paper files...",
+                    "  {} on {} doc/paper files via {} ({})...",
                     "Semantic extraction".cyan(),
-                    doc_files.len()
+                    doc_files.len(),
+                    provider_name,
+                    config.model,
                 );
                 let concurrency = jobs.unwrap_or(4).min(8);
                 let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(concurrency));
@@ -689,7 +741,7 @@ async fn cmd_build(
                         "document"
                     };
                     let doc_p = doc_path.clone();
-                    let key_clone = key.clone();
+                    let cfg_clone = config.clone();
                     let sem_clone = sem.clone();
                     let handle = rt.spawn(async move {
                         let _permit = sem_clone
@@ -697,7 +749,7 @@ async fn cmd_build(
                             .await
                             .map_err(|e| anyhow::anyhow!("semaphore closed: {e}"))?;
                         graphify_extract::semantic::extract_semantic(
-                            &doc_p, &content, file_type, &key_clone,
+                            &doc_p, &content, file_type, &cfg_clone,
                         )
                         .await
                         .map(|r| (doc_p, r))
@@ -742,7 +794,7 @@ async fn cmd_build(
         } else if n_doc + n_paper > 0 {
             info_print!(
                 verb,
-                "  {} Set ANTHROPIC_API_KEY to enable semantic extraction for {} doc/paper files",
+                "  {} Configure [llm] in graphify.toml to enable semantic extraction for {} doc/paper files",
                 "ℹ".blue(),
                 n_doc + n_paper
             );
@@ -1232,6 +1284,18 @@ fn cmd_init() -> Result<()> {
 # Export formats (comma-separated). Available: json,html,graphml,cypher,svg,wiki,obsidian,report
 # Leave empty or omit for all formats.
 # formats = ["json", "html", "report"]
+
+# LLM provider for semantic extraction
+# [llm]
+# provider = "anthropic"          # anthropic | openai | ollama | openai_compatible
+# model = "claude-sonnet-4-20250514"  # required, no default
+# anthropic_api_key = "sk-..."    # optional, falls back to ANTHROPIC_API_KEY env or Claude Code OAuth
+# anthropic_base_url = "https://api.anthropic.com"  # optional override
+# openai_api_key = "sk-..."       # optional, falls back to OPENAI_API_KEY env
+# openai_base_url = "https://api.openai.com/v1"     # optional override
+# ollama_base_url = "http://localhost:11434"          # optional override
+# openai_compatible_api_key = "..."                   # optional
+# openai_compatible_base_url = "http://localhost:8000/v1"  # required for openai_compatible
 "#,
     )?;
     println!("{} Created graphify.toml", "✓".green());
