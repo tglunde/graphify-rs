@@ -13,7 +13,7 @@ pub fn export_cypher(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resul
 
     // Nodes
     for node in graph.nodes() {
-        let node_type_label = format!("{:?}", node.node_type);
+        let node_type_label = format!("{}", node.node_type);
         write!(
             cypher,
             "CREATE (n{}:{} {{id: '{}', label: '{}', source_file: '{}'",
@@ -42,7 +42,7 @@ pub fn export_cypher(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resul
             .replace(|c: char| !c.is_alphanumeric() && c != '_', "_");
         writeln!(
             cypher,
-            "CREATE (n{})-[:{}  {{relation: '{}', confidence: '{:?}', confidence_score: {:.2}, source_file: '{}', weight: {:.2}}}]->(n{});",
+            "CREATE (n{})-[:{}  {{relation: '{}', confidence: '{}', confidence_score: {:.2}, source_file: '{}', weight: {:.2}}}]->(n{});",
             sanitize_var(&edge.source),
             rel_type,
             cypher_escape(&edge.relation),

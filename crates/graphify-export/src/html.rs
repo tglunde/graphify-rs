@@ -73,7 +73,7 @@ pub fn export_html(
         let size = 8.0 + (degree as f64).sqrt() * 4.0;
         let label_escaped = escape_js(&node.label);
         let title_escaped = escape_js(&format!(
-            "{} ({})\nFile: {}\nType: {:?}\nDegree: {}",
+            "{} ({})\nFile: {}\nType: {}\nDegree: {}",
             node.label, node.id, node.source_file, node.node_type, degree
         ));
         write!(
@@ -106,7 +106,7 @@ pub fn export_html(
         };
         let width = 1.0 + edge.confidence_score * 2.0;
         let title_escaped = escape_js(&format!(
-            "{}: {} → {}\nConfidence: {:?} ({:.2})\nFile: {}",
+            "{}: {} → {}\nConfidence: {} ({:.2})\nFile: {}",
             edge.relation,
             edge.source,
             edge.target,
@@ -693,7 +693,7 @@ fn generate_community_page(
             escape_js(&node.id),
             escape_js(&node.label),
             escape_js(&format!(
-                "{}\nType: {:?}\nFile: {}\nDegree: {}",
+                "{}\nType: {}\nFile: {}\nDegree: {}",
                 node.label, node.node_type, node.source_file, degree
             )),
             color,
@@ -726,7 +726,7 @@ fn generate_community_page(
             escape_js(&edge.relation),
             dashes,
             escape_js(&format!(
-                "{}: {} → {}\nConfidence: {:?}",
+                "{}: {} → {}\nConfidence: {}",
                 edge.relation, edge.source, edge.target, edge.confidence
             )),
         )?;

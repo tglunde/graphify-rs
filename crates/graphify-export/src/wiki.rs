@@ -104,7 +104,7 @@ pub fn export_wiki(
             let node = graph.get_node(nid);
             let node_label = node.map(|n| n.label.as_str()).unwrap_or(nid.as_str());
             let node_type = node
-                .map(|n| format!("{:?}", n.node_type))
+                .map(|n| format!("{}", n.node_type))
                 .unwrap_or_default();
             let degree = graph.degree(nid);
             writeln!(

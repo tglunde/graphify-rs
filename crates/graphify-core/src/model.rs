@@ -32,11 +32,34 @@ pub enum NodeType {
     Namespace,
 }
 
+impl std::fmt::Display for NodeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NodeType::Class => write!(f, "Class"),
+            NodeType::Function => write!(f, "Function"),
+            NodeType::Module => write!(f, "Module"),
+            NodeType::Concept => write!(f, "Concept"),
+            NodeType::Paper => write!(f, "Paper"),
+            NodeType::Image => write!(f, "Image"),
+            NodeType::File => write!(f, "File"),
+            NodeType::Method => write!(f, "Method"),
+            NodeType::Interface => write!(f, "Interface"),
+            NodeType::Enum => write!(f, "Enum"),
+            NodeType::Struct => write!(f, "Struct"),
+            NodeType::Trait => write!(f, "Trait"),
+            NodeType::Constant => write!(f, "Constant"),
+            NodeType::Variable => write!(f, "Variable"),
+            NodeType::Package => write!(f, "Package"),
+            NodeType::Namespace => write!(f, "Namespace"),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // GraphNode
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GraphNode {
     pub id: String,
     pub label: String,
@@ -62,7 +85,7 @@ fn default_weight() -> f64 {
     1.0
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GraphEdge {
     pub source: String,
     pub target: String,

@@ -737,18 +737,18 @@ fn test_all_export_formats() {
         .collect();
     let token_cost: HashMap<String, usize> =
         HashMap::from([("input".into(), 0), ("output".into(), 0)]);
-    let report = graphify_export::generate_report(
-        &graph,
-        &communities,
-        &cohesion,
-        &community_labels,
-        &god_json,
-        &surprise_json,
-        &detection_json,
-        &token_cost,
-        ".",
-        Some(&question_json),
-    )
+    let report = graphify_export::generate_report(&graphify_export::ReportInput {
+        graph: &graph,
+        communities: &communities,
+        cohesion_scores: &cohesion,
+        community_labels: &community_labels,
+        god_nodes: &god_json,
+        surprises: &surprise_json,
+        detection_result: &detection_json,
+        token_cost: &token_cost,
+        root: ".",
+        suggested_questions: Some(&question_json),
+    })
     .unwrap();
     assert!(
         report.contains("Graph Analysis Report"),

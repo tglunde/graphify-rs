@@ -50,7 +50,7 @@ pub fn export_obsidian(
         // --- YAML frontmatter ---
         content.push_str("---\n");
         writeln!(content, "id: {}", node.id).unwrap();
-        writeln!(content, "type: {:?}", node.node_type).unwrap();
+        writeln!(content, "type: {}", node.node_type).unwrap();
         if !node.source_file.is_empty() {
             writeln!(content, "source: {}", node.source_file).unwrap();
         }

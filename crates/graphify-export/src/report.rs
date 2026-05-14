@@ -9,20 +9,44 @@ use graphify_core::confidence::Confidence;
 use graphify_core::graph::KnowledgeGraph;
 use tracing::info;
 
+/// Input data for report generation.
+pub struct ReportInput<'a> {
+    pub graph: &'a KnowledgeGraph,
+    pub communities: &'a HashMap<usize, Vec<String>>,
+    pub cohesion_scores: &'a HashMap<usize, f64>,
+    pub community_labels: &'a HashMap<usize, String>,
+    pub god_nodes: &'a [serde_json::Value],
+    pub surprises: &'a [serde_json::Value],
+    pub detection_result: &'a serde_json::Value,
+    pub token_cost: &'a HashMap<String, usize>,
+    pub root: &'a str,
+    pub suggested_questions: Option<&'a [serde_json::Value]>,
+}
+
 /// Generate a comprehensive markdown analysis report.
-#[allow(clippy::too_many_arguments)]
-pub fn generate_report(
-    graph: &KnowledgeGraph,
-    communities: &HashMap<usize, Vec<String>>,
-    cohesion_scores: &HashMap<usize, f64>,
-    community_labels: &HashMap<usize, String>,
-    god_nodes: &[serde_json::Value],
-    surprises: &[serde_json::Value],
-    detection_result: &serde_json::Value,
-    token_cost: &HashMap<String, usize>,
-    root: &str,
-    suggested_questions: Option<&[serde_json::Value]>,
-) -> anyhow::Result<String> {
+pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
+    let ReportInput {
+        graph,
+        communities,
+        cohesion_scores,
+        community_labels,
+        god_nodes,
+        surprises,
+        detection_result,
+        token_cost,
+        root,
+        suggested_questions,
+    } = input;
+    let graph = *graph;
+    let communities = *communities;
+    let cohesion_scores = *cohesion_scores;
+    let community_labels = *community_labels;
+    let god_nodes = *god_nodes;
+    let surprises = *surprises;
+    let detection_result = *detection_result;
+    let token_cost = *token_cost;
+    let root = *root;
+    let suggested_questions = *suggested_questions;
     let mut report = String::with_capacity(8192);
 
     // Header
@@ -330,18 +354,18 @@ mod tests {
         let cohesion: HashMap<usize, f64> = [(0, 0.9)].into();
         let labels: HashMap<usize, String> = [(0, "Core".into())].into();
 
-        let report = generate_report(
-            &kg,
-            &communities,
-            &cohesion,
-            &labels,
-            &[],
-            &[],
-            &serde_json::json!({}),
-            &HashMap::new(),
-            "/test",
-            None,
-        )
+        let report = generate_report(&ReportInput {
+            graph: &kg,
+            communities: &communities,
+            cohesion_scores: &cohesion,
+            community_labels: &labels,
+            god_nodes: &[],
+            surprises: &[],
+            detection_result: &serde_json::json!({}),
+            token_cost: &HashMap::new(),
+            root: "/test",
+            suggested_questions: None,
+        })
         .unwrap();
 
         assert!(report.contains("# 📊 Graph Analysis Report"));

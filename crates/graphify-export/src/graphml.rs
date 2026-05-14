@@ -85,7 +85,7 @@ pub fn export_graphml(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resu
         .unwrap();
         writeln!(
             xml,
-            r#"      <data key="node_type">{:?}</data>"#,
+            r#"      <data key="node_type">{}</data>"#,
             node.node_type
         )
         .unwrap();
@@ -119,7 +119,7 @@ pub fn export_graphml(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resu
         .unwrap();
         writeln!(
             xml,
-            r#"      <data key="confidence">{:?}</data>"#,
+            r#"      <data key="confidence">{}</data>"#,
             edge.confidence
         )
         .unwrap();

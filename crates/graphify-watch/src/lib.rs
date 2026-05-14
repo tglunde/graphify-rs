@@ -219,18 +219,18 @@ fn rebuild(
         HashMap::from([("input".to_string(), 0), ("output".to_string(), 0)]);
 
     let root_str = root.to_string_lossy();
-    if let Ok(report) = graphify_export::generate_report(
-        &graph,
-        &communities,
-        &cohesion,
-        &community_labels,
-        &god_json,
-        &surprise_json,
-        &detection_json,
-        &token_cost,
-        &root_str,
-        Some(&question_json),
-    ) {
+    if let Ok(report) = graphify_export::generate_report(&graphify_export::ReportInput {
+        graph: &graph,
+        communities: &communities,
+        cohesion_scores: &cohesion,
+        community_labels: &community_labels,
+        god_nodes: &god_json,
+        surprises: &surprise_json,
+        detection_result: &detection_json,
+        token_cost: &token_cost,
+        root: &root_str,
+        suggested_questions: Some(&question_json),
+    }) {
         let report_path = output_dir.join("GRAPH_REPORT.md");
         let _ = std::fs::write(&report_path, &report);
     }
