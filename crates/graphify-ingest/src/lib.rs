@@ -247,10 +247,12 @@ fn extract_between(haystack: &str, start: &str, end: &str) -> Option<String> {
 
 /// Strip `<script>` and `<style>` blocks from HTML.
 fn strip_scripts_and_styles(html: &str) -> String {
-    static RE_SCRIPT: std::sync::LazyLock<Regex> =
-        std::sync::LazyLock::new(|| Regex::new(r"(?is)<script[^>]*>.*?</script>").expect("valid regex"));
-    static RE_STYLE: std::sync::LazyLock<Regex> =
-        std::sync::LazyLock::new(|| Regex::new(r"(?is)<style[^>]*>.*?</style>").expect("valid regex"));
+    static RE_SCRIPT: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+        Regex::new(r"(?is)<script[^>]*>.*?</script>").expect("valid regex")
+    });
+    static RE_STYLE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+        Regex::new(r"(?is)<style[^>]*>.*?</style>").expect("valid regex")
+    });
     let result = RE_SCRIPT.replace_all(html, "");
     RE_STYLE.replace_all(&result, "").to_string()
 }

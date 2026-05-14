@@ -317,7 +317,9 @@ pub async fn watch_directory(root: &Path, output_dir: &Path) -> Result<(), Watch
 
         let root_clone = root.to_path_buf();
         let out_clone = output_dir.to_path_buf();
-        match tokio::task::spawn_blocking(move || rebuild(&root_clone, &out_clone, Some(&relevant))).await {
+        match tokio::task::spawn_blocking(move || rebuild(&root_clone, &out_clone, Some(&relevant)))
+            .await
+        {
             Ok(Ok(())) => println!("Rebuild complete."),
             Ok(Err(e)) => eprintln!("Rebuild failed: {e}"),
             Err(e) => eprintln!("Rebuild panicked: {e}"),

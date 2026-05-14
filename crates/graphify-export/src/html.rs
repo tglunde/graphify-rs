@@ -85,8 +85,7 @@ pub fn export_html(
             color,
             cid.unwrap_or(0),
             size,
-        )
-        ?;
+        )?;
     }
     vis_nodes.push(']');
 
@@ -124,8 +123,7 @@ pub fn export_html(
             title_escaped,
             dashes,
             width,
-        )
-        ?;
+        )?;
     }
     vis_edges.push(']');
 
@@ -138,8 +136,7 @@ pub fn export_html(
             r#"<div class="legend-item"><span class="legend-dot" style="background:{}"></span>{}</div>"#,
             color,
             escape_html(label),
-        )
-        ?;
+        )?;
     }
 
     // Build hyperedge info
@@ -151,8 +148,7 @@ pub fn export_html(
             escape_html(&he.relation),
             escape_html(&he.label),
             he.nodes.join(", "),
-        )
-        ?;
+        )?;
     }
 
     // Banner for pruned graphs
@@ -533,8 +529,7 @@ fn generate_overview(
             title = escape_js(&title),
             color = color,
             size = size,
-        )
-        ?;
+        )?;
     }
     vis_nodes.push(']');
 
@@ -566,8 +561,7 @@ fn generate_overview(
             to = to,
             count = count,
             width = width,
-        )
-        ?;
+        )?;
     }
     vis_edges.push(']');
 
@@ -589,8 +583,7 @@ fn generate_overview(
             color = color,
             label = escape_html(&label),
             count = count,
-        )
-        ?;
+        )?;
     }
 
     let html = format!(
@@ -705,8 +698,7 @@ fn generate_community_page(
             )),
             color,
             size,
-        )
-        ?;
+        )?;
     }
     vis_nodes.push(']');
 
@@ -737,8 +729,7 @@ fn generate_community_page(
                 "{}: {} → {}\nConfidence: {:?}",
                 edge.relation, edge.source, edge.target, edge.confidence
             )),
-        )
-        ?;
+        )?;
     }
     vis_edges.push(']');
 
@@ -779,8 +770,7 @@ fn generate_community_page(
             color = ext_color,
             label = escape_html(&ext_label),
             count = count,
-        )
-        ?;
+        )?;
     }
 
     let is_large = members.len() > 500;
@@ -1055,7 +1045,8 @@ mod tests {
                 node_type: NodeType::Function,
                 community: Some(0),
                 extra: HashMap::new(),
-            }).unwrap();
+            })
+            .unwrap();
         }
         for i in 1..10 {
             let _ = kg.add_edge(GraphEdge {

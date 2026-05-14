@@ -300,9 +300,8 @@ fn tool_result_text(text: &str) -> Value {
 }
 
 fn tool_result_json<T: serde::Serialize>(value: &T) -> Value {
-    let text = serde_json::to_string_pretty(value).unwrap_or_else(|e| {
-        format!("{{\"error\": \"serialization failed: {}\"}}", e)
-    });
+    let text = serde_json::to_string_pretty(value)
+        .unwrap_or_else(|e| format!("{{\"error\": \"serialization failed: {}\"}}", e));
     tool_result_text(&text)
 }
 

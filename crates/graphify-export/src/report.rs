@@ -68,22 +68,19 @@ pub fn generate_report(
         "| EXTRACTED | {} | {:.1}% |",
         extracted,
         extracted as f64 / total as f64 * 100.0
-    )
-    ?;
+    )?;
     writeln!(
         report,
         "| INFERRED | {} | {:.1}% |",
         inferred,
         inferred as f64 / total as f64 * 100.0
-    )
-    ?;
+    )?;
     writeln!(
         report,
         "| AMBIGUOUS | {} | {:.1}% |",
         ambiguous,
         ambiguous as f64 / total as f64 * 100.0
-    )
-    ?;
+    )?;
     writeln!(report)?;
 
     // God Nodes
@@ -133,8 +130,7 @@ pub fn generate_report(
                 he.relation,
                 he.label,
                 he.nodes.join(", ")
-            )
-            ?;
+            )?;
         }
         writeln!(report)?;
     }
@@ -157,8 +153,7 @@ pub fn generate_report(
             label,
             members.len(),
             cohesion
-        )
-        ?;
+        )?;
         writeln!(report)?;
         for nid in members.iter().take(20) {
             let node_label = graph
@@ -184,8 +179,7 @@ pub fn generate_report(
                     report,
                     "- {} → {} ({}, score: {:.2})",
                     edge.source, edge.target, edge.relation, edge.confidence_score
-                )
-                ?;
+                )?;
                 count += 1;
                 if count >= 30 {
                     writeln!(report, "- _…and more_")?;
@@ -230,8 +224,7 @@ pub fn generate_report(
             report,
             "**Thin communities** (< 3 nodes): {} communities",
             thin.len()
-        )
-        ?;
+        )?;
         writeln!(report)?;
     }
 
@@ -348,7 +341,8 @@ mod tests {
             &HashMap::new(),
             "/test",
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(report.contains("# 📊 Graph Analysis Report"));
         assert!(report.contains("## Summary"));

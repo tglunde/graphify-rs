@@ -127,8 +127,7 @@ fn chrono_days_since_epoch() -> u64 {
         .unwrap_or_default()
         .as_secs();
     // 2020-01-01 = 1577836800 epoch seconds
-    let days_since_2020 = secs.saturating_sub(1577836800) / 86400;
-    days_since_2020
+    secs.saturating_sub(1577836800) / 86400
 }
 
 #[cfg(test)]

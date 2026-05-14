@@ -119,7 +119,11 @@ pub fn export_svg(
             writeln!(
                 svg,
                 "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"{}\" fill=\"{}\" opacity=\"0.85\"><title>{}</title></circle>",
-                x, y, NODE_RADIUS, color, svg_escape(&node.label)
+                x,
+                y,
+                NODE_RADIUS,
+                color,
+                svg_escape(&node.label)
             )?;
         }
     }

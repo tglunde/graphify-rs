@@ -46,8 +46,7 @@ pub fn export_wiki(
             filename.trim_end_matches(".md"),
             label,
             members.len()
-        )
-        ?;
+        )?;
     }
     writeln!(index)?;
 
@@ -79,8 +78,7 @@ pub fn export_wiki(
                 filename.trim_end_matches(".md"),
                 label,
                 degree
-            )
-            ?;
+            )?;
         }
         writeln!(index)?;
     }
@@ -113,8 +111,7 @@ pub fn export_wiki(
                 page,
                 "- **{}** (`{}`, {}, degree: {})",
                 node_label, nid, node_type, degree
-            )
-            ?;
+            )?;
         }
         writeln!(page)?;
 
@@ -137,8 +134,7 @@ pub fn export_wiki(
                     page,
                     "- {} → {} ({})",
                     edge.source, edge.target, edge.relation
-                )
-                ?;
+                )?;
             }
             writeln!(page)?;
         }
@@ -181,8 +177,7 @@ pub fn export_wiki(
                     page,
                     "- {} → {} ({}, {:?})",
                     edge.source, edge.target, edge.relation, edge.confidence
-                )
-                ?;
+                )?;
             }
             writeln!(page)?;
         }

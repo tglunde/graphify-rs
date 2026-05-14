@@ -31,18 +31,45 @@ macro_rules! re {
 re!(RE_PY_CLASS, r"(?m)^(\s*)class\s+(\w+)");
 re!(RE_PY_CLASS_LOOKUP, r"^(\s*)class\s+(\w+)");
 re!(RE_PY_FUNC, r"(?m)^(\s*)def\s+(\w+)\s*\(");
-re!(RE_PY_IMPORT, r"(?m)^(?:from\s+([\w.]+)\s+)?import\s+([\w.,\s*]+)");
+re!(
+    RE_PY_IMPORT,
+    r"(?m)^(?:from\s+([\w.]+)\s+)?import\s+([\w.,\s*]+)"
+);
 
-re!(RE_JS_CLASS, r"(?m)(?:export\s+)?(?:default\s+)?class\s+(\w+)");
-re!(RE_JS_FUNC, r"(?m)(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)\s*\(|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[^=])\s*=>");
-re!(RE_JS_IMPORT, r#"(?m)import\s+(?:\{([^}]+)\}|(\w+))\s+from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"]"#);
-re!(RE_JS_REQUIRE, r#"(?m)(?:const|let|var)\s+(\w+)\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)"#);
+re!(
+    RE_JS_CLASS,
+    r"(?m)(?:export\s+)?(?:default\s+)?class\s+(\w+)"
+);
+re!(
+    RE_JS_FUNC,
+    r"(?m)(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)\s*\(|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[^=])\s*=>"
+);
+re!(
+    RE_JS_IMPORT,
+    r#"(?m)import\s+(?:\{([^}]+)\}|(\w+))\s+from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"]"#
+);
+re!(
+    RE_JS_REQUIRE,
+    r#"(?m)(?:const|let|var)\s+(\w+)\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)"#
+);
 
-re!(RE_RS_STRUCT, r"(?m)^(?:\s*pub(?:\([^)]*\))?\s+)?struct\s+(\w+)");
+re!(
+    RE_RS_STRUCT,
+    r"(?m)^(?:\s*pub(?:\([^)]*\))?\s+)?struct\s+(\w+)"
+);
 re!(RE_RS_ENUM, r"(?m)^(?:\s*pub(?:\([^)]*\))?\s+)?enum\s+(\w+)");
-re!(RE_RS_TRAIT, r"(?m)^(?:\s*pub(?:\([^)]*\))?\s+)?trait\s+(\w+)");
-re!(RE_RS_IMPL, r"(?m)^(?:\s*)impl(?:<[^>]*>)?\s+(?:(\w+)\s+for\s+)?(\w+)");
-re!(RE_RS_FUNC, r"(?m)^(\s*)(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:unsafe\s+)?(?:const\s+)?fn\s+(\w+)");
+re!(
+    RE_RS_TRAIT,
+    r"(?m)^(?:\s*pub(?:\([^)]*\))?\s+)?trait\s+(\w+)"
+);
+re!(
+    RE_RS_IMPL,
+    r"(?m)^(?:\s*)impl(?:<[^>]*>)?\s+(?:(\w+)\s+for\s+)?(\w+)"
+);
+re!(
+    RE_RS_FUNC,
+    r"(?m)^(\s*)(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:unsafe\s+)?(?:const\s+)?fn\s+(\w+)"
+);
 re!(RE_RS_USE, r"(?m)^(?:\s*)(?:pub\s+)?use\s+([\w:]+)");
 
 re!(RE_GO_TYPE, r"(?m)^type\s+(\w+)\s+(struct|interface)");
@@ -51,30 +78,66 @@ re!(RE_GO_IMPORT_SINGLE, r#"(?m)^import\s+"([^"]+)""#);
 re!(RE_GO_IMPORT_BLOCK, r"(?s)import\s*\(([^)]+)\)");
 re!(RE_GO_IMPORT_LINE, r#""([^"]+)""#);
 
-re!(RE_JAVA_CLASS, r"(?m)(?:public\s+|private\s+|protected\s+)?(?:abstract\s+|static\s+|final\s+)*(class|interface|enum)\s+(\w+)");
-re!(RE_JAVA_METHOD, r"(?m)^\s+(?:public\s+|private\s+|protected\s+)?(?:static\s+)?(?:final\s+)?(?:synchronized\s+)?(?:abstract\s+)?(?:\w+(?:<[^>]*>)?)\s+(\w+)\s*\(");
+re!(
+    RE_JAVA_CLASS,
+    r"(?m)(?:public\s+|private\s+|protected\s+)?(?:abstract\s+|static\s+|final\s+)*(class|interface|enum)\s+(\w+)"
+);
+re!(
+    RE_JAVA_METHOD,
+    r"(?m)^\s+(?:public\s+|private\s+|protected\s+)?(?:static\s+)?(?:final\s+)?(?:synchronized\s+)?(?:abstract\s+)?(?:\w+(?:<[^>]*>)?)\s+(\w+)\s*\("
+);
 re!(RE_JAVA_IMPORT, r"(?m)^import\s+(?:static\s+)?([\w.]+)\s*;");
 
 re!(RE_C_INCLUDE, r#"(?m)^#include\s+[<"]([^>"]+)[>"]"#);
-re!(RE_CPP_CLASS, r"(?m)^(?:\s*)(?:class|struct|namespace)\s+(\w+)");
+re!(
+    RE_CPP_CLASS,
+    r"(?m)^(?:\s*)(?:class|struct|namespace)\s+(\w+)"
+);
 re!(RE_C_STRUCT, r"(?m)^(?:typedef\s+)?struct\s+(\w+)");
-re!(RE_C_FUNC, r"(?m)^(?:static\s+)?(?:inline\s+)?(?:extern\s+)?(?:const\s+)?(?:unsigned\s+)?(?:signed\s+)?(?:\w+(?:\s*\*\s*|\s+))(\w+)\s*\([^;]*\)\s*\{");
+re!(
+    RE_C_FUNC,
+    r"(?m)^(?:static\s+)?(?:inline\s+)?(?:extern\s+)?(?:const\s+)?(?:unsigned\s+)?(?:signed\s+)?(?:\w+(?:\s*\*\s*|\s+))(\w+)\s*\([^;]*\)\s*\{"
+);
 
 re!(RE_RB_CLASS, r"(?m)^\s*(class|module)\s+(\w+(?:::\w+)*)");
 re!(RE_RB_FUNC, r"(?m)^\s*def\s+(self\.)?(\w+[?!=]?)");
-re!(RE_RB_REQUIRE, r#"(?m)^\s*require(?:_relative)?\s+['"]([^'"]+)['"]"#);
+re!(
+    RE_RB_REQUIRE,
+    r#"(?m)^\s*require(?:_relative)?\s+['"]([^'"]+)['"]"#
+);
 
-re!(RE_CS_CLASS, r"(?m)(?:public\s+|private\s+|protected\s+|internal\s+)?(?:abstract\s+|static\s+|sealed\s+|partial\s+)*(class|interface|struct|enum)\s+(\w+)");
-re!(RE_CS_METHOD, r"(?m)^\s+(?:public\s+|private\s+|protected\s+|internal\s+)?(?:static\s+)?(?:virtual\s+)?(?:override\s+)?(?:async\s+)?(?:\w+(?:<[^>]*>)?)\s+(\w+)\s*\(");
+re!(
+    RE_CS_CLASS,
+    r"(?m)(?:public\s+|private\s+|protected\s+|internal\s+)?(?:abstract\s+|static\s+|sealed\s+|partial\s+)*(class|interface|struct|enum)\s+(\w+)"
+);
+re!(
+    RE_CS_METHOD,
+    r"(?m)^\s+(?:public\s+|private\s+|protected\s+|internal\s+)?(?:static\s+)?(?:virtual\s+)?(?:override\s+)?(?:async\s+)?(?:\w+(?:<[^>]*>)?)\s+(\w+)\s*\("
+);
 re!(RE_CS_USING, r"(?m)^using\s+([\w.]+)\s*;");
 
-re!(RE_KT_CLASS, r"(?m)(?:open\s+|abstract\s+|data\s+|sealed\s+)?(?:class|object|interface)\s+(\w+)");
-re!(RE_KT_FUNC, r"(?m)^\s*(?:(?:private|public|protected|internal|override|open|suspend)\s+)*fun\s+(?:<[^>]+>\s+)?(\w+)\s*\(");
+re!(
+    RE_KT_CLASS,
+    r"(?m)(?:open\s+|abstract\s+|data\s+|sealed\s+)?(?:class|object|interface)\s+(\w+)"
+);
+re!(
+    RE_KT_FUNC,
+    r"(?m)^\s*(?:(?:private|public|protected|internal|override|open|suspend)\s+)*fun\s+(?:<[^>]+>\s+)?(\w+)\s*\("
+);
 re!(RE_KT_IMPORT, r"(?m)^import\s+([\w.]+)");
 
-re!(RE_GEN_CLASS, r"(?m)^\s*(?:(?:pub|public|private|protected|internal|open|abstract|sealed|partial|static|final|export)\s+)*(?:class|struct|module|object|interface|trait|protocol|enum|defmodule)\s+(\w+(?:::\w+)*)");
-re!(RE_GEN_FUNC, r"(?m)^\s*(?:(?:pub|public|private|protected|internal|open|override|suspend|static|async|export|def|defp)\s+)*(?:func|function|fn|def|defp|fun|sub)\s+(\w+[?!]?)\s*[\(<]");
-re!(RE_GEN_IMPORT, r#"(?m)^\s*(?:import|use|using|require|include|from)\s+['"]?([\w./:-]+)['"]?"#);
+re!(
+    RE_GEN_CLASS,
+    r"(?m)^\s*(?:(?:pub|public|private|protected|internal|open|abstract|sealed|partial|static|final|export)\s+)*(?:class|struct|module|object|interface|trait|protocol|enum|defmodule)\s+(\w+(?:::\w+)*)"
+);
+re!(
+    RE_GEN_FUNC,
+    r"(?m)^\s*(?:(?:pub|public|private|protected|internal|open|override|suspend|static|async|export|def|defp)\s+)*(?:func|function|fn|def|defp|fun|sub)\s+(\w+[?!]?)\s*[\(<]"
+);
+re!(
+    RE_GEN_IMPORT,
+    r#"(?m)^\s*(?:import|use|using|require|include|from)\s+['"]?([\w./:-]+)['"]?"#
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Public entry point
