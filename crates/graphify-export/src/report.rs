@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use graphify_core::confidence::Confidence;
 use graphify_core::graph::KnowledgeGraph;
+use graphify_core::model::{GodNode, Surprise};
 use tracing::info;
 
 /// Input data for report generation.
@@ -15,8 +16,8 @@ pub struct ReportInput<'a> {
     pub communities: &'a HashMap<usize, Vec<String>>,
     pub cohesion_scores: &'a HashMap<usize, f64>,
     pub community_labels: &'a HashMap<usize, String>,
-    pub god_nodes: &'a [serde_json::Value],
-    pub surprises: &'a [serde_json::Value],
+    pub god_nodes: &'a [GodNode],
+    pub surprises: &'a [Surprise],
     pub detection_result: &'a serde_json::Value,
     pub token_cost: &'a HashMap<String, usize>,
     pub root: &'a str,
@@ -116,14 +117,11 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
         writeln!(report, "| Node | Degree | Community |")?;
         writeln!(report, "|------|--------|-----------|")?;
         for gn in god_nodes {
-            let label = gn.get("label").and_then(|v| v.as_str()).unwrap_or("?");
-            let degree = gn.get("degree").and_then(|v| v.as_u64()).unwrap_or(0);
             let comm = gn
-                .get("community")
-                .and_then(|v| v.as_u64())
+                .community
                 .map(|c| c.to_string())
                 .unwrap_or_else(|| "–".into());
-            writeln!(report, "| {} | {} | {} |", label, degree, comm)?;
+            writeln!(report, "| {} | {} | {} |", gn.label, gn.degree, comm)?;
         }
     }
     writeln!(report)?;
@@ -135,10 +133,7 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
         writeln!(report, "_No surprising connections found._")?;
     } else {
         for s in surprises {
-            let src = s.get("source").and_then(|v| v.as_str()).unwrap_or("?");
-            let tgt = s.get("target").and_then(|v| v.as_str()).unwrap_or("?");
-            let rel = s.get("relation").and_then(|v| v.as_str()).unwrap_or("?");
-            writeln!(report, "- **{}** → **{}** ({})", src, tgt, rel)?;
+            writeln!(report, "- **{}** → **{}** ({})", s.source, s.target, s.relation)?;
         }
     }
     writeln!(report)?;

@@ -203,14 +203,6 @@ fn rebuild(
         "total_words": detection.total_words,
         "warning": detection.warning,
     });
-    let god_json: Vec<serde_json::Value> = god_list
-        .iter()
-        .map(|g| serde_json::json!({"label": g.label, "edges": g.degree}))
-        .collect();
-    let surprise_json: Vec<serde_json::Value> = surprise_list
-        .iter()
-        .map(|s| serde_json::to_value(s).unwrap_or_default())
-        .collect();
     let question_json: Vec<serde_json::Value> = questions
         .iter()
         .map(|q| serde_json::to_value(q).unwrap_or_default())
@@ -224,8 +216,8 @@ fn rebuild(
         communities: &communities,
         cohesion_scores: &cohesion,
         community_labels: &community_labels,
-        god_nodes: &god_json,
-        surprises: &surprise_json,
+        god_nodes: &god_list,
+        surprises: &surprise_list,
         detection_result: &detection_json,
         token_cost: &token_cost,
         root: &root_str,

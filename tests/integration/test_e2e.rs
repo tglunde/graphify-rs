@@ -723,14 +723,6 @@ fn test_all_export_formats() {
     let surprise_list = graphify_analyze::surprising_connections(&graph, &communities, 3);
     let questions = graphify_analyze::suggest_questions(&graph, &communities, &community_labels, 3);
     let detection_json = serde_json::json!({"total_files": 1, "total_words": 50, "warning": null});
-    let god_json: Vec<serde_json::Value> = god_list
-        .iter()
-        .map(|g| serde_json::json!({"label": g.label, "edges": g.degree}))
-        .collect();
-    let surprise_json: Vec<serde_json::Value> = surprise_list
-        .iter()
-        .map(|s| serde_json::to_value(s).unwrap_or_default())
-        .collect();
     let question_json: Vec<serde_json::Value> = questions
         .iter()
         .map(|q| serde_json::to_value(q).unwrap_or_default())
@@ -742,8 +734,8 @@ fn test_all_export_formats() {
         communities: &communities,
         cohesion_scores: &cohesion,
         community_labels: &community_labels,
-        god_nodes: &god_json,
-        surprises: &surprise_json,
+        god_nodes: &god_list,
+        surprises: &surprise_list,
         detection_result: &detection_json,
         token_cost: &token_cost,
         root: ".",
