@@ -680,6 +680,7 @@ fn step_export(
             .iter()
             .flat_map(|(ft, paths)| paths.iter().map(move |p| (p.clone(), *ft)))
             .collect(),
+        hashes: HashMap::new(),
     };
     graphify_detect::save_manifest(&manifest_path, &manifest)?;
 

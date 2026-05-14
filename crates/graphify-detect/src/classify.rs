@@ -121,21 +121,25 @@ fn is_inside_xcode_asset(path: &Path) -> bool {
 /// Heuristic: read the first N chars and count regex hits from [`PAPER_SIGNALS`].
 /// Returns `true` when the hit count reaches [`PAPER_SIGNAL_THRESHOLD`].
 fn looks_like_paper(path: &Path) -> bool {
-    let content = match fs::read_to_string(path) {
-        Ok(s) => s,
+    // Read only the first PAPER_PEEK_CHARS bytes instead of the entire file.
+    use std::io::Read;
+    let mut file = match fs::File::open(path) {
+        Ok(f) => f,
         Err(_) => return false,
     };
-
-    let peek: &str = if content.len() > PAPER_PEEK_CHARS {
-        // Find a valid char boundary at or before PAPER_PEEK_CHARS
-        let mut end = PAPER_PEEK_CHARS;
-        while end > 0 && !content.is_char_boundary(end) {
-            end -= 1;
-        }
-        &content[..end]
-    } else {
-        &content
+    let mut buf = vec![0u8; PAPER_PEEK_CHARS];
+    let n = match file.read(&mut buf) {
+        Ok(n) => n,
+        Err(_) => return false,
     };
+    buf.truncate(n);
+
+    // Find a valid UTF-8 boundary
+    let mut end = n;
+    while end > 0 && std::str::from_utf8(&buf[..end]).is_err() {
+        end -= 1;
+    }
+    let peek = std::str::from_utf8(&buf[..end]).unwrap_or("");
 
     let mut hits = 0usize;
     for pattern in PAPER_SIGNALS {

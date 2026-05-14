@@ -672,6 +672,7 @@ name = "graphify-detect"
 version = "0.4.5"
 dependencies = [
  "globset",
+ "graphify-cache",
  "graphify-core",
  "regex",
  "serde",
@@ -803,6 +804,7 @@ version = "0.4.5"
 dependencies = [
  "graphify-analyze",
  "graphify-core",
+ "graphify-security",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

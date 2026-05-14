@@ -12,16 +12,16 @@ pub const MAX_SAFE_SIZE: usize = 10 * 1024 * 1024;
 
 /// Validate a URL: must be http/https, must not resolve to private/localhost IPs.
 ///
-/// Returns the parsed [`Url`] on success.
+/// Note: this is a static check only. It does not protect against DNS rebinding
+/// attacks where a public hostname resolves to a private IP at request time.
+/// For full SSRF protection, also check the resolved IP after DNS lookup.
 pub fn validate_url(url_str: &str) -> Result<Url, SecurityError> {
     let url = Url::parse(url_str)?;
 
-    // Only allow http/https
     if url.scheme() != "http" && url.scheme() != "https" {
         return Err(SecurityError::InvalidScheme(url.scheme().to_string()));
     }
 
-    // Block private/reserved IPs
     if let Some(host) = url.host_str() {
         if is_private_host(host) {
             return Err(SecurityError::PrivateIp(host.to_string()));
@@ -35,38 +35,64 @@ pub fn validate_url(url_str: &str) -> Result<Url, SecurityError> {
 
 /// Check whether a host string refers to a private or reserved address.
 fn is_private_host(host: &str) -> bool {
-    // Exact matches
-    if host == "localhost" || host == "::1" || host == "[::1]" {
+    if host == "localhost" {
         return true;
     }
 
-    // Prefix-based checks for IPv4 private/reserved ranges
-    if host.starts_with("127.")
-        || host.starts_with("10.")
-        || host.starts_with("192.168.")
-        || host.starts_with("169.254.")
-        || host.starts_with("0.")
-    {
-        return true;
+    // Try parsing as IP address (handles IPv4, IPv6, and various representations)
+    if let Ok(ip) = host.trim_start_matches('[').trim_end_matches(']').parse::<std::net::IpAddr>() {
+        return ip_is_private(&ip);
     }
 
-    // 172.16.0.0 – 172.31.255.255
-    if is_172_private(host) {
-        return true;
+    // Try parsing as IPv4 with octal/hex components (e.g., 0x7f000001, 0177.0.0.1)
+    if let Some(ipv4) = parse_nonstandard_ipv4(host) {
+        return ip_is_private(&std::net::IpAddr::V4(ipv4));
     }
 
     false
 }
 
-/// Check whether a host falls in the 172.16.0.0/12 private range.
-fn is_172_private(host: &str) -> bool {
-    if let Some(rest) = host.strip_prefix("172.")
-        && let Some(second_octet_str) = rest.split('.').next()
-        && let Ok(second_octet) = second_octet_str.parse::<u8>()
-    {
-        return (16..=31).contains(&second_octet);
+/// Check if an IP address is private, loopback, link-local, or reserved.
+fn ip_is_private(ip: &std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                // Carrier-Grade NAT (RFC 6598) — used by cloud metadata services
+                || is_in_range(v4, &std::net::Ipv4Addr::new(100, 64, 0, 0), &std::net::Ipv4Addr::new(100, 127, 255, 255))
+                // Benchmarking (RFC 2544)
+                || is_in_range(v4, &std::net::Ipv4Addr::new(198, 18, 0, 0), &std::net::Ipv4Addr::new(198, 19, 255, 255))
+        }
+        std::net::IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || v6.is_unspecified()
+                // Unique Local Addresses (fc00::/7)
+                || matches!(v6.octets()[0] & 0xfe, 0xfc)
+                // Link-Local (fe80::/10)
+                || matches!(v6.octets()[0], 0xfe) && matches!(v6.octets()[1] & 0xc0, 0x80)
+        }
     }
-    false
+}
+
+fn is_in_range(ip: &std::net::Ipv4Addr, start: &std::net::Ipv4Addr, end: &std::net::Ipv4Addr) -> bool {
+    let ip_u32 = u32::from(*ip);
+    ip_u32 >= u32::from(*start) && ip_u32 <= u32::from(*end)
+}
+
+/// Try parsing non-standard IPv4 representations (decimal, hex, octal).
+fn parse_nonstandard_ipv4(host: &str) -> Option<std::net::Ipv4Addr> {
+    // Handle decimal representation (e.g., 2130706433 = 127.0.0.1)
+    if let Ok(num) = host.parse::<u32>() {
+        return Some(std::net::Ipv4Addr::from(num));
+    }
+    // Handle hex representation (e.g., 0x7f000001)
+    if let Some(hex) = host.strip_prefix("0x").or_else(|| host.strip_prefix("0X"))
+        && let Ok(num) = u32::from_str_radix(hex, 16) {
+            return Some(std::net::Ipv4Addr::from(num));
+        }
+    None
 }
 
 #[cfg(test)]

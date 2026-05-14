@@ -6,12 +6,19 @@ use crate::SecurityError;
 
 /// Ensure a path stays within an allowed directory (no `../` traversal).
 ///
-/// Both `path` and `allowed_root` are canonicalized before comparison, so
-/// symlinks and relative components are resolved.
+/// Uses `canonicalize` to resolve symlinks and relative components.
+/// Returns `PathNotFound` for non-existent paths (distinguishable from
+/// `PathTraversal`) and `PathTraversal` for actual escape attempts.
 pub fn safe_path(path: &Path, allowed_root: &Path) -> Result<PathBuf, SecurityError> {
     let canonical = path
         .canonicalize()
-        .map_err(|_| SecurityError::PathTraversal(path.to_string_lossy().to_string()))?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                SecurityError::PathNotFound(path.to_string_lossy().to_string())
+            } else {
+                SecurityError::PathTraversal(path.to_string_lossy().to_string())
+            }
+        })?;
     let root = allowed_root
         .canonicalize()
         .map_err(|_| SecurityError::PathTraversal(allowed_root.to_string_lossy().to_string()))?;
@@ -78,7 +85,7 @@ mod tests {
     #[test]
     fn test_safe_path_nonexistent_file() {
         let result = safe_path(Path::new("/nonexistent/path/file.txt"), Path::new("/tmp"));
-        assert!(matches!(result, Err(SecurityError::PathTraversal(_))));
+        assert!(matches!(result, Err(SecurityError::PathNotFound(_))));
     }
 
     #[test]

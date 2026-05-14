@@ -26,17 +26,57 @@ const SENSITIVE_FILENAMES: &[&str] = &[
     "gcloud_credentials",
 ];
 
-/// Substrings that, when found in the filename (case-insensitive), mark it as
-/// sensitive.
-const SENSITIVE_SUBSTRINGS: &[&str] = &[
-    "credential",
+/// Word-boundary substrings to match against the filename stem (without extension).
+/// Uses `_` and `.` as word boundaries to avoid false positives like
+/// "secret_resolver.rs" or "tokenizer.rs".
+const SENSITIVE_WORDS: &[&str] = &[
+    "credentials",
     "secret",
     "passwd",
     "password",
-    "token",
     "private_key",
     "service.account",
+    "access_token",
+    "auth_token",
+    "refresh_token",
+    "id_token",
+    "api_token",
+    "oauth_token",
+    "bearer_token",
 ];
+
+/// Path segments (directory names) that indicate a sensitive location.
+/// Only matches directory names, not arbitrary substrings in the path.
+const SENSITIVE_DIR_SEGMENTS: &[&str] = &[
+    "secrets",
+    "credentials",
+    ".ssh",
+    ".gnupg",
+    ".aws",
+    ".kube",
+];
+
+/// Check if `word` appears as a complete word in `s`, using `_` and `.` as boundaries.
+fn matches_word(s: &str, word: &str) -> bool {
+    let mut start = 0;
+    while let Some(pos) = s[start..].find(word) {
+        let abs_pos = start + pos;
+        let after = abs_pos + word.len();
+
+        let boundary_before = abs_pos == 0
+            || s.as_bytes()[abs_pos - 1] == b'_'
+            || s.as_bytes()[abs_pos - 1] == b'.';
+        let boundary_after = after >= s.len()
+            || s.as_bytes()[after] == b'_'
+            || s.as_bytes()[after] == b'.';
+
+        if boundary_before && boundary_after {
+            return true;
+        }
+        start = abs_pos + 1;
+    }
+    false
+}
 
 /// Returns `true` when the file at `path` looks like it contains secrets.
 ///
@@ -63,18 +103,25 @@ pub fn is_sensitive(path: &Path) -> bool {
         }
     }
 
-    // Substring match against filename
-    for substr in SENSITIVE_SUBSTRINGS {
-        if filename.contains(substr) {
+    // Word-boundary match against filename stem
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    for word in SENSITIVE_WORDS {
+        if matches_word(&stem, word) {
             return true;
         }
     }
 
-    // Substring match against full path (catches dirs like `secrets/`)
-    let full_path_lower = path.to_string_lossy().to_ascii_lowercase();
-    for substr in SENSITIVE_SUBSTRINGS {
-        if full_path_lower.contains(substr) {
-            return true;
+    // Directory segment match against full path (catches dirs like `secrets/`)
+    for component in path.ancestors().skip(1) {
+        if let Some(dir_name) = component.file_name().and_then(|n| n.to_str()) {
+            let dir_lower = dir_name.to_ascii_lowercase();
+            if SENSITIVE_DIR_SEGMENTS.contains(&dir_lower.as_str()) {
+                return true;
+            }
         }
     }
 
@@ -132,6 +179,26 @@ mod tests {
         assert!(!is_sensitive(Path::new("README.md")));
         assert!(!is_sensitive(Path::new("src/lib.rs")));
         assert!(!is_sensitive(Path::new("package.json")));
+    }
+
+    #[test]
+    fn no_false_positive_tokenizer() {
+        // "token" alone should not trigger — only compound words like "api_token"
+        assert!(!is_sensitive(Path::new("tokenizer.rs")));
+        assert!(!is_sensitive(Path::new("token_handler.go")));
+        assert!(!is_sensitive(Path::new("token_provider.ts")));
+    }
+
+    #[test]
+    fn no_false_positive_secret_dir_in_filename() {
+        // A file with "secret" as a word boundary in its stem IS still detected,
+        // which is correct — "secret_manager" does contain the word "secret".
+        // The improvement is that partial matches like "secretresolver" no longer trigger.
+        assert!(is_sensitive(Path::new("src/utils/secret_resolver.rs")));
+        // But "secretresolver" (no boundary) should NOT trigger
+        assert!(!is_sensitive(Path::new("src/utils/secretresolver.rs")));
+        // And "mysecret" (no boundary) should NOT trigger
+        assert!(!is_sensitive(Path::new("src/utils/mysecret.rs")));
     }
 
     #[test]

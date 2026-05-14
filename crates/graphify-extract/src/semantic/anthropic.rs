@@ -61,11 +61,21 @@ pub async fn extract_anthropic(
         AuthType::ApiKey => {
             if let Some(ref key) = config.api_key {
                 request = request.header("x-api-key", key);
+            } else {
+                anyhow::bail!(
+                    "No API key configured for Anthropic. \
+                     Set ANTHROPIC_API_KEY or configure [llm] in graphify.toml"
+                );
             }
         }
         AuthType::Bearer => {
             if let Some(ref token) = config.api_key {
                 request = request.header("authorization", format!("Bearer {token}"));
+            } else {
+                anyhow::bail!(
+                    "No OAuth token configured for Anthropic. \
+                     Run `claude login` or configure [llm] in graphify.toml"
+                );
             }
         }
     }

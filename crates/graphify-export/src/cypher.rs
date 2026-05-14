@@ -4,6 +4,8 @@ use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use std::collections::HashMap;
+
 use graphify_core::graph::KnowledgeGraph;
 use tracing::info;
 
@@ -11,13 +13,18 @@ use tracing::info;
 pub fn export_cypher(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Result<PathBuf> {
     let mut cypher = String::with_capacity(4096);
 
+    // Build unique variable names to avoid collisions when different IDs
+    // sanitize to the same name (e.g., "foo.bar" and "foo_bar" → both "foo_bar")
+    let var_names = build_unique_var_names(graph);
+
     // Nodes
     for node in graph.nodes() {
+        let var = var_names.get(&node.id).map(|s| s.as_str()).unwrap_or("n");
         let node_type_label = format!("{}", node.node_type);
         write!(
             cypher,
-            "CREATE (n{}:{} {{id: '{}', label: '{}', source_file: '{}'",
-            sanitize_var(&node.id),
+            "CREATE ({}:{} {{id: '{}', label: '{}', source_file: '{}'",
+            var,
             node_type_label,
             cypher_escape(&node.id),
             cypher_escape(&node.label),
@@ -40,17 +47,25 @@ pub fn export_cypher(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resul
             .relation
             .to_uppercase()
             .replace(|c: char| !c.is_alphanumeric() && c != '_', "_");
+        let src_var = var_names
+            .get(&edge.source)
+            .map(|s| s.as_str())
+            .unwrap_or("n");
+        let tgt_var = var_names
+            .get(&edge.target)
+            .map(|s| s.as_str())
+            .unwrap_or("n");
         writeln!(
             cypher,
-            "CREATE (n{})-[:{}  {{relation: '{}', confidence: '{}', confidence_score: {:.2}, source_file: '{}', weight: {:.2}}}]->(n{});",
-            sanitize_var(&edge.source),
-            rel_type,
-            cypher_escape(&edge.relation),
-            edge.confidence,
-            edge.confidence_score,
-            cypher_escape(&edge.source_file),
-            edge.weight,
-            sanitize_var(&edge.target),
+            "CREATE ({src})-[:{rel} {{relation: '{relation}', confidence: '{confidence}', confidence_score: {score:.2}, source_file: '{file}', weight: {weight:.2}}}]->({tgt});",
+            src = src_var,
+            rel = rel_type,
+            relation = cypher_escape(&edge.relation),
+            confidence = edge.confidence,
+            score = edge.confidence_score,
+            file = cypher_escape(&edge.source_file),
+            weight = edge.weight,
+            tgt = tgt_var,
         )?;
     }
 
@@ -78,8 +93,34 @@ fn sanitize_var(id: &str) -> String {
     out
 }
 
+fn build_unique_var_names(graph: &KnowledgeGraph) -> HashMap<String, String> {
+    let mut name_to_ids: HashMap<String, Vec<String>> = HashMap::new();
+    for node in graph.nodes() {
+        let sanitized = sanitize_var(&node.id);
+        name_to_ids
+            .entry(sanitized)
+            .or_default()
+            .push(node.id.clone());
+    }
+
+    let mut result = HashMap::new();
+    for (sanitized, ids) in name_to_ids {
+        if ids.len() == 1 {
+            result.insert(ids.into_iter().next().unwrap(), sanitized);
+        } else {
+            for (i, id) in ids.into_iter().enumerate() {
+                result.insert(id, format!("{sanitized}_{i}"));
+            }
+        }
+    }
+    result
+}
+
 fn cypher_escape(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('\'', "\\'")
+    s.replace('\\', "\\\\")
+        .replace('\'', "\\'")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
 }
 
 #[cfg(test)]
@@ -135,9 +176,43 @@ mod tests {
         assert!(path.exists());
 
         let content = std::fs::read_to_string(&path).unwrap();
-        assert!(content.contains("CREATE (n"));
+        assert!(content.contains("CREATE ("));
         assert!(content.contains("CALLS"));
         assert!(content.contains("MyClass"));
+    }
+
+    #[test]
+    fn var_name_collision_gets_suffix() {
+        let mut kg = KnowledgeGraph::new();
+        kg.add_node(GraphNode {
+            id: "foo.bar".into(),
+            label: "FooBar".into(),
+            source_file: "a.rs".into(),
+            source_location: None,
+            node_type: NodeType::Class,
+            community: None,
+            extra: HashMap::new(),
+        })
+        .unwrap();
+        kg.add_node(GraphNode {
+            id: "foo_bar".into(),
+            label: "FooBar2".into(),
+            source_file: "b.rs".into(),
+            source_location: None,
+            node_type: NodeType::Function,
+            community: None,
+            extra: HashMap::new(),
+        })
+        .unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = export_cypher(&kg, dir.path()).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+
+        // Both IDs sanitize to "foo_bar", so they should get suffixed: foo_bar_0, foo_bar_1
+        assert!(content.contains("foo_bar_0"));
+        assert!(content.contains("foo_bar_1"));
+        assert!(!content.contains("foo_bar}"));
     }
 
     #[test]
@@ -149,5 +224,11 @@ mod tests {
     #[test]
     fn cypher_escape_quotes() {
         assert_eq!(cypher_escape("it's"), "it\\'s");
+    }
+
+    #[test]
+    fn cypher_escape_newlines() {
+        assert_eq!(cypher_escape("line1\nline2"), "line1\\nline2");
+        assert_eq!(cypher_escape("line1\r\nline2"), "line1\\r\\nline2");
     }
 }

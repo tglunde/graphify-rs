@@ -73,6 +73,9 @@ pub struct DetectResult {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Manifest {
     pub files: HashMap<String, FileType>,
+    /// Content hashes keyed by relative path, for incremental change detection.
+    #[serde(default)]
+    pub hashes: HashMap<String, String>,
 }
 
 const DEFAULT_MANIFEST_NAME: &str = ".graphify_manifest.json";
@@ -196,26 +199,40 @@ pub fn detect(root: &Path) -> DetectResult {
 }
 
 /// Incremental detection: compares against a stored manifest and returns only
-/// changed / new files.
+/// changed / new files. Uses content hashes to detect modifications in
+/// existing files.
 pub fn detect_incremental(root: &Path, manifest_path: Option<&str>) -> DetectResult {
     let manifest_file = root.join(manifest_path.unwrap_or(DEFAULT_MANIFEST_NAME));
     let old_manifest = load_manifest(&manifest_file).unwrap_or_default();
 
     let result = detect(root);
 
-    // Build a new manifest from the result
+    // Build a new manifest with content hashes from the result
     let mut new_manifest = Manifest::default();
     for (ft, paths) in &result.files {
         for p in paths {
+            let hash = if std::path::Path::new(root)
+                .join(p)
+                .exists() { {
+                    graphify_cache::file_hash(&root.join(p))
+                        .unwrap_or_default()
+                } } else { Default::default() };
             new_manifest.files.insert(p.clone(), *ft);
+            new_manifest
+                .hashes
+                .insert(p.clone(), hash);
         }
     }
 
-    // Filter to only new or changed files
+    // Filter to only new or changed files (hash mismatch = changed)
     let mut filtered_files: HashMap<FileType, Vec<String>> = HashMap::new();
     for (ft, paths) in &result.files {
         for p in paths {
-            if !old_manifest.files.contains_key(p) {
+            let old_hash = old_manifest.hashes.get(p);
+            let new_hash = new_manifest.hashes.get(p);
+            let is_new = old_hash.is_none();
+            let is_changed = old_hash.is_some() && old_hash != new_hash;
+            if is_new || is_changed {
                 filtered_files.entry(*ft).or_default().push(p.clone());
             }
         }
@@ -229,13 +246,13 @@ pub fn detect_incremental(root: &Path, manifest_path: Option<&str>) -> DetectRes
     }
 
     info!(
-        "detect_incremental: {filtered_total} new files (total {total} on disk)",
+        "detect_incremental: {filtered_total} new/changed files (total {total} on disk)",
         total = result.total_files,
     );
 
     DetectResult {
         files: filtered_files,
-        total_files: filtered_total,
+        total_files: result.total_files,
         total_words: result.total_words,
         needs_graph: result.needs_graph,
         warning: result.warning,
@@ -420,14 +437,16 @@ mod tests {
         let r1 = detect_incremental(root, None);
         assert!(r1.total_files >= 3);
 
-        // Second run: nothing new
+        // Second run: nothing new (all files unchanged)
         let r2 = detect_incremental(root, None);
-        assert_eq!(r2.total_files, 0, "no new files expected on second run");
+        let r2_new_count: usize = r2.files.values().map(|v| v.len()).sum();
+        assert_eq!(r2_new_count, 0, "no new/changed files expected on second run");
 
         // Add a new file
         fs::write(root.join("new_file.ts"), "const x = 1;").unwrap();
         let r3 = detect_incremental(root, None);
-        assert_eq!(r3.total_files, 1, "expected exactly 1 new file");
+        let r3_new_count: usize = r3.files.values().map(|v| v.len()).sum();
+        assert_eq!(r3_new_count, 1, "expected exactly 1 new file");
         let code = r3.files.get(&FileType::Code).expect("expected code");
         assert!(code.iter().any(|p| p.contains("new_file.ts")));
     }

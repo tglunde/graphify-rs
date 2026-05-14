@@ -45,7 +45,10 @@ fn extract_with_treesitter(
     let tree = parser.parse(source, None)?;
     let root = tree.root_node();
 
-    let stem = path.file_stem()?.to_str()?;
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown");
     let str_path = path.to_string_lossy();
 
     let mut nodes = Vec::new();
@@ -182,8 +185,8 @@ fn walk_node(
 
     // ---- Imports ----
     if config.import_types.contains(kind) {
-        // For Ruby, `call` is in both import_types and call_types.
-        // Only treat require/require_relative as imports; let other calls recurse normally.
+        // For Ruby/Elixir, `call` is in multiple type sets.
+        // Only treat specific calls as imports; let other calls recurse normally.
         if lang == "ruby" && kind == "call" {
             let method_name = node
                 .child_by_field_name("method")
@@ -194,6 +197,16 @@ fn walk_node(
                 return;
             }
             // Not a require call, fall through to normal processing
+        } else if lang == "elixir" && kind == "call" {
+            let target = node
+                .child_by_field_name(config.name_field)
+                .map(|n| node_text(n, source))
+                .unwrap_or_default();
+            if matches!(target.as_str(), "import" | "use" | "require" | "alias") {
+                extract_import(node, source, file_nid, str_path, lang, edges, nodes);
+                return;
+            }
+            // Not an import call — fall through to class/function checks
         } else {
             extract_import(node, source, file_nid, str_path, lang, edges, nodes);
             return; // Don't recurse into import children
@@ -202,6 +215,30 @@ fn walk_node(
 
     // ---- Classes / Structs / Enums / Traits ----
     if config.class_types.contains(kind) {
+        if lang == "elixir" && kind == "call" {
+            let target = node
+                .child_by_field_name(config.name_field)
+                .map(|n| node_text(n, source))
+                .unwrap_or_default();
+            if target != "defmodule" && target != "defprotocol" && target != "defimpl" {
+                // Not a module definition — skip class handling
+            } else {
+                handle_class_like(
+                    node,
+                    source,
+                    config,
+                    lang,
+                    file_nid,
+                    stem,
+                    str_path,
+                    nodes,
+                    edges,
+                    seen_ids,
+                    function_bodies,
+                );
+                return;
+            }
+        } else {
         handle_class_like(
             node,
             source,
@@ -216,10 +253,35 @@ fn walk_node(
             function_bodies,
         );
         return;
+        }
     }
 
     // ---- Functions / Methods ----
     if config.function_types.contains(kind) {
+        if lang == "elixir" && kind == "call" {
+            let target = node
+                .child_by_field_name(config.name_field)
+                .map(|n| node_text(n, source))
+                .unwrap_or_default();
+            if matches!(target.as_str(), "def" | "defp" | "defmacro" | "defmacrop" | "defguard" | "defguardp" | "defdelegate") {
+                handle_function(
+                    node,
+                    source,
+                    config,
+                    lang,
+                    file_nid,
+                    stem,
+                    str_path,
+                    nodes,
+                    edges,
+                    seen_ids,
+                    function_bodies,
+                    parent_class_nid,
+                );
+                return;
+            }
+            // Not a function definition — fall through to recursion
+        } else {
         handle_function(
             node,
             source,
@@ -235,6 +297,7 @@ fn walk_node(
             parent_class_nid,
         );
         return;
+        }
     }
 
     // ---- Default: recurse into children ----

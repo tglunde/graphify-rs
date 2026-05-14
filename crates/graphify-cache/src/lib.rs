@@ -98,7 +98,11 @@ pub fn save_cached_to<T: Serialize>(
         Ok(json) => {
             if fs::write(&tmp, &json).is_ok() {
                 debug!(?cache_path, "cache write");
-                fs::rename(&tmp, &cache_path).is_ok()
+                let ok = fs::rename(&tmp, &cache_path).is_ok();
+                if !ok {
+                    let _ = fs::remove_file(&tmp);
+                }
+                ok
             } else {
                 false
             }

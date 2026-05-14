@@ -190,9 +190,10 @@ impl KnowledgeGraph {
 
     /// Stream the graph as NetworkX `node_link_data` JSON directly to a writer.
     ///
-    /// Unlike `to_node_link_json()`, this avoids building the entire JSON tree
-    /// in memory. For a 50K-node graph this saves ~500 MB of intermediate
-    /// allocations.
+    /// Serialize to the NetworkX `node_link_data` JSON format, writing to
+    /// the provided writer. Uses a streaming serializer to avoid building
+    /// an intermediate JSON Value tree, but still collects node/edge
+    /// references into a Vec for serialization.
     pub fn write_node_link_json<W: Write>(&self, writer: W) -> serde_json::Result<()> {
         use serde::ser::SerializeMap;
         use serde_json::ser::{PrettyFormatter, Serializer};
@@ -205,7 +206,7 @@ impl KnowledgeGraph {
         map.serialize_entry("multigraph", &false)?;
         map.serialize_entry("graph", &serde_json::Map::new())?;
 
-        // Stream nodes one by one
+        // Collect node references for serialization
         let nodes: Vec<&GraphNode> = self
             .graph
             .node_indices()
@@ -213,7 +214,7 @@ impl KnowledgeGraph {
             .collect();
         map.serialize_entry("nodes", &nodes)?;
 
-        // Stream edges one by one
+        // Collect edge references for serialization
         let links: Vec<&GraphEdge> = self
             .graph
             .edge_indices()

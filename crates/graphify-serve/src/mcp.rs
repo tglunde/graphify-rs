@@ -723,7 +723,12 @@ fn handle_graph_diff(graph: &KnowledgeGraph, args: &Value) -> Value {
         return tool_result_error("Missing required parameter: other_graph");
     }
 
-    let other_graph = match crate::load_graph(std::path::Path::new(other_path)) {
+    let path = std::path::Path::new(other_path);
+    if let Err(e) = graphify_security::validate_graph_path(other_path) {
+        return tool_result_error(&format!("Invalid path: {e}"));
+    }
+
+    let other_graph = match crate::load_graph(path) {
         Ok(g) => g,
         Err(e) => return tool_result_error(&format!("Failed to load graph: {e}")),
     };

@@ -191,12 +191,16 @@ pub fn extract(paths: &[PathBuf]) -> ExtractionResult {
 ///
 /// Also handles `from x import *` by expanding to all entities in module x.
 fn resolve_python_imports(result: &mut ExtractionResult) {
-    // Build a lookup from node label → node id
-    let label_to_id: HashMap<String, String> = result
-        .nodes
-        .iter()
-        .map(|n| (n.label.clone(), n.id.clone()))
-        .collect();
+    // Build a lookup from node label → [(id, source_file)]
+    let label_to_ids: HashMap<String, Vec<(String, String)>> = {
+        let mut map: HashMap<String, Vec<(String, String)>> = HashMap::new();
+        for n in &result.nodes {
+            map.entry(n.label.clone())
+                .or_default()
+                .push((n.id.clone(), n.source_file.clone()));
+        }
+        map
+    };
 
     // Build module stem → [entity_id] for star import expansion
     let mut stem_to_entity_ids: HashMap<String, Vec<String>> = HashMap::new();
@@ -253,10 +257,17 @@ fn resolve_python_imports(result: &mut ExtractionResult) {
                     }
                 }
             } else {
-                // Regular import — resolve by label
-                if let Some(resolved_id) = label_to_id.get(&edge.target) {
-                    edge.target = resolved_id.clone();
-                    edge.confidence = graphify_core::confidence::Confidence::Extracted;
+                // Regular import — resolve by label, prefer same-file match
+                if let Some(candidates) = label_to_ids.get(&edge.target) {
+                    let resolved = candidates
+                        .iter()
+                        .find(|(_, sf)| sf == &edge.source_file)
+                        .or_else(|| candidates.first())
+                        .map(|(id, _)| id.clone());
+                    if let Some(resolved_id) = resolved {
+                        edge.target = resolved_id;
+                        edge.confidence = graphify_core::confidence::Confidence::Extracted;
+                    }
                 }
             }
         }
@@ -418,8 +429,55 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
             None => continue,
         };
 
-        // Create uses edges: each entity in the importing file → each entity in the target module
+        // Create uses edges: match local entities to target entities by label
+        // instead of the full cartesian product (local × target), which would
+        // create O(N*M) spurious edges for large files.
+        let target_by_label: HashMap<&str, &String> = target_entities
+            .iter()
+            .filter_map(|(lbl, id, _)| {
+                if !lbl.is_empty() {
+                    Some((lbl.as_str(), id))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         for local_id in local_entities {
+            let local_label = match id_to_label.get(local_id) {
+                Some(l) => l,
+                None => continue,
+            };
+
+            // If a target entity has the same label as the local entity,
+            // that's a strong signal of a real usage relationship.
+            if let Some(&target_id) = target_by_label.get(local_label.as_str()) {
+                if local_id == target_id {
+                    continue;
+                }
+                let key = (local_id.clone(), target_id.clone());
+                if seen.contains(&key) {
+                    continue;
+                }
+                seen.insert(key);
+                new_edges.push(GraphEdge {
+                    source: local_id.clone(),
+                    target: target_id.clone(),
+                    relation: "uses".to_string(),
+                    confidence: Confidence::Inferred,
+                    confidence_score: 0.8,
+                    source_file: source_file.clone(),
+                    source_location: None,
+                    weight: 0.8,
+                    extra: Default::default(),
+                });
+                continue;
+            }
+
+            // Fallback: create edges to all target entities, but cap per import
+            // to avoid O(N*M) explosion for files with many entities.
+            const MAX_FALLBACK_EDGES: usize = 50;
+            let mut count = 0;
             for (_, target_id, _) in &target_entities {
                 if local_id == target_id {
                     continue;
@@ -440,6 +498,10 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
                     weight: 0.8,
                     extra: Default::default(),
                 });
+                count += 1;
+                if count >= MAX_FALLBACK_EDGES {
+                    break;
+                }
             }
         }
     }

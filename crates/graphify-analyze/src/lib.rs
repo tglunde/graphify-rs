@@ -682,7 +682,7 @@ pub fn detect_cycles(graph: &KnowledgeGraph, max_cycles: usize) -> Vec<Dependenc
     cycles
 }
 
-/// Tarjan's algorithm for finding strongly connected components.
+/// Iterative Tarjan's algorithm for finding strongly connected components.
 fn tarjan_scc(adj: &[Vec<usize>], n: usize) -> Vec<Vec<usize>> {
     let mut index_counter = 0usize;
     let mut stack: Vec<usize> = Vec::new();
@@ -691,73 +691,63 @@ fn tarjan_scc(adj: &[Vec<usize>], n: usize) -> Vec<Vec<usize>> {
     let mut lowlink = vec![0usize; n];
     let mut result: Vec<Vec<usize>> = Vec::new();
 
-    #[allow(clippy::too_many_arguments)]
-    fn strongconnect(
-        v: usize,
-        adj: &[Vec<usize>],
-        index_counter: &mut usize,
-        stack: &mut Vec<usize>,
-        on_stack: &mut [bool],
-        index: &mut [usize],
-        lowlink: &mut [usize],
-        result: &mut Vec<Vec<usize>>,
-    ) {
-        index[v] = *index_counter;
-        lowlink[v] = *index_counter;
-        *index_counter += 1;
-        stack.push(v);
-        on_stack[v] = true;
-
-        for &w in &adj[v] {
-            if index[w] == usize::MAX {
-                strongconnect(
-                    w,
-                    adj,
-                    index_counter,
-                    stack,
-                    on_stack,
-                    index,
-                    lowlink,
-                    result,
-                );
-                lowlink[v] = lowlink[v].min(lowlink[w]);
-            } else if on_stack[w] {
-                lowlink[v] = lowlink[v].min(index[w]);
-            }
+    for start in 0..n {
+        if index[start] != usize::MAX {
+            continue;
         }
 
-        if lowlink[v] == index[v] {
-            let mut component = Vec::new();
-            while let Some(w) = stack.pop() {
-                on_stack[w] = false;
-                component.push(w);
-                if w == v {
-                    break;
+        // Explicit call stack: (node, neighbor_index)
+        let mut call_stack: Vec<(usize, usize)> = Vec::new();
+
+        index[start] = index_counter;
+        lowlink[start] = index_counter;
+        index_counter += 1;
+        stack.push(start);
+        on_stack[start] = true;
+        call_stack.push((start, 0));
+
+        while let Some((v, mut ni)) = call_stack.pop() {
+            if ni < adj[v].len() {
+                let w = adj[v][ni];
+                ni += 1;
+                call_stack.push((v, ni));
+
+                if index[w] == usize::MAX {
+                    index[w] = index_counter;
+                    lowlink[w] = index_counter;
+                    index_counter += 1;
+                    stack.push(w);
+                    on_stack[w] = true;
+                    call_stack.push((w, 0));
+                } else if on_stack[w] {
+                    lowlink[v] = lowlink[v].min(index[w]);
+                }
+            } else {
+                // All neighbors processed
+                if lowlink[v] == index[v] {
+                    let mut component = Vec::new();
+                    while let Some(w) = stack.pop() {
+                        on_stack[w] = false;
+                        component.push(w);
+                        if w == v {
+                            break;
+                        }
+                    }
+                    result.push(component);
+                }
+
+                // Propagate lowlink to parent
+                if let Some(&(parent, _)) = call_stack.last() {
+                    lowlink[parent] = lowlink[parent].min(lowlink[v]);
                 }
             }
-            result.push(component);
-        }
-    }
-
-    for v in 0..n {
-        if index[v] == usize::MAX {
-            strongconnect(
-                v,
-                adj,
-                &mut index_counter,
-                &mut stack,
-                &mut on_stack,
-                &mut index,
-                &mut lowlink,
-                &mut result,
-            );
         }
     }
 
     result
 }
 
-/// Find a simple cycle within a strongly connected component.
+/// Find a simple cycle within a strongly connected component using iterative DFS.
 fn find_cycle_in_scc(
     adj: &[Vec<usize>],
     scc: &[usize],
@@ -770,38 +760,34 @@ fn find_cycle_in_scc(
     let mut visited = HashSet::new();
     let mut path = Vec::new();
 
-    fn dfs_cycle(
-        node: usize,
-        start: usize,
-        adj: &[Vec<usize>],
-        scc_set: &HashSet<usize>,
-        visited: &mut HashSet<usize>,
-        path: &mut Vec<usize>,
-    ) -> bool {
-        path.push(node);
-        visited.insert(node);
+    // Stack: (node, neighbor_index)
+    let mut dfs_stack: Vec<(usize, usize)> = vec![(start, 0)];
+    path.push(start);
+    visited.insert(start);
 
-        for &next in &adj[node] {
+    while let Some((node, ni)) = dfs_stack.last_mut() {
+        if *ni < adj[*node].len() {
+            let next = adj[*node][*ni];
+            *ni += 1;
+
             if !scc_set.contains(&next) {
                 continue;
             }
             if next == start && path.len() > 1 {
-                return true; // Found cycle back to start
+                return Some(path.clone());
             }
-            if !visited.contains(&next) && dfs_cycle(next, start, adj, scc_set, visited, path) {
-                return true;
+            if !visited.contains(&next) {
+                visited.insert(next);
+                path.push(next);
+                dfs_stack.push((next, 0));
             }
+        } else {
+            dfs_stack.pop();
+            path.pop();
         }
-
-        path.pop();
-        false
     }
 
-    if dfs_cycle(start, start, adj, scc_set, &mut visited, &mut path) {
-        Some(path)
-    } else {
-        None
-    }
+    None
 }
 
 pub mod embedding;

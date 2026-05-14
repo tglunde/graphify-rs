@@ -110,13 +110,36 @@ fn git_file_stats(repo_root: &Path, file: &str) -> Option<(usize, String)> {
 }
 
 /// Simple day counter: days since 2020-01-01 from an ISO date string.
+/// Uses the same calculation as [`chrono_days_since_epoch`] to avoid
+/// offset from using different approximations.
 fn date_to_age(date_str: &str, now_days: u64) -> u64 {
+    match days_since_epoch_2020(date_str) {
+        Some(file_days) => now_days.saturating_sub(file_days).max(1),
+        None => 1,
+    }
+}
+
+/// Compute approximate days since 2020-01-01 from an ISO date string.
+/// Uses cumulative days per month to avoid the 30-day/month approximation
+/// which caused up to ~30 day offset vs the precise epoch calculation.
+/// Returns `None` for invalid date strings.
+fn days_since_epoch_2020(date_str: &str) -> Option<u64> {
     let parts: Vec<u64> = date_str.split('-').filter_map(|p| p.parse().ok()).collect();
     if parts.len() < 3 {
-        return 1;
+        return None;
     }
-    let file_days = (parts[0] - 2020) * 365 + parts[1] * 30 + parts[2];
-    now_days.saturating_sub(file_days).max(1)
+    let (y, m, d) = (parts[0], parts[1], parts[2]);
+    if m == 0 || m > 12 || d == 0 {
+        return None;
+    }
+    // Cumulative days for months Jan..Nov (0-indexed)
+    const CUM_DAYS: [u64; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    let leap_extra = if m > 2 && (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) {
+        1
+    } else {
+        0
+    };
+    Some((y.saturating_sub(2020)) * 365 + CUM_DAYS.get(m as usize - 1).copied().unwrap_or(0) + leap_extra + d)
 }
 
 /// Approximate days since 2020-01-01 for "now".
@@ -136,13 +159,26 @@ mod tests {
 
     #[test]
     fn date_to_age_computes_correctly() {
-        let now = (2026 - 2020) * 365 + 4 * 30 + 13; // ~2026-04-13
+        // 2026-04-13 in epoch-2020 days:
+        // 6 * 365 + CUM_DAYS[3] (90) + 13 = 2283
+        let now = 6 * 365 + 90 + 13;
         let age = date_to_age("2026-01-01", now);
-        assert!(age > 0 && age < 200);
+        // 2026-01-01 = 6*365 + 0 + 1 = 2191; 2283 - 2191 = 92
+        assert!(age > 0 && age < 200, "age = {age}");
     }
 
     #[test]
     fn date_to_age_invalid_returns_1() {
         assert_eq!(date_to_age("invalid", 2300), 1);
+    }
+
+    #[test]
+    fn days_since_epoch_consistent() {
+        // 2020-01-01 should be day 1 (minimum)
+        assert_eq!(days_since_epoch_2020("2020-01-01"), Some(1));
+        // 2020-02-01 = 31 + 1 = 32
+        assert_eq!(days_since_epoch_2020("2020-02-01"), Some(32));
+        // 2021-01-01 = 365 + 1 = 366
+        assert_eq!(days_since_epoch_2020("2021-01-01"), Some(366));
     }
 }

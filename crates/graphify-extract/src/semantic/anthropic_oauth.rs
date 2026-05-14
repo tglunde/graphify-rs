@@ -4,6 +4,8 @@ use tracing::debug;
 ///
 /// Checks both `~/.claude/config.json` and `~/.claude/credentials.json` for an OAuth token.
 /// Returns `None` if no file exists or no token field is found.
+/// Note: `apiKey` fields are intentionally excluded — they should use `AuthType::ApiKey`,
+/// not Bearer token.
 pub fn read_claude_code_oauth_token() -> Option<String> {
     let home = dirs::home_dir()?;
     let paths = [
@@ -40,11 +42,11 @@ fn read_token_from_file(path: &std::path::Path) -> Option<String> {
     }
 
     // Try common field names for OAuth access tokens
+    // Note: "apiKey" is excluded — it should be used via AuthType::ApiKey, not Bearer
     for field in &[
         "accessToken",
         "access_token",
         "oauthToken",
-        "apiKey",
         "token",
     ] {
         if let Some(val) = json
@@ -100,14 +102,15 @@ mod tests {
     }
 
     #[test]
-    fn reads_apikey_field() {
+    fn ignores_apikey_field() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("credentials.json");
         let mut f = std::fs::File::create(&path).unwrap();
-        write!(f, r#"{{"apiKey": "test-oauth-token"}}"#).unwrap();
+        write!(f, r#"{{"apiKey": "sk-ant-xxx"}}"#).unwrap();
 
         let token = read_token_from_file(&path);
-        assert_eq!(token.as_deref(), Some("test-oauth-token"));
+        // apiKey should NOT be treated as an OAuth token
+        assert!(token.is_none());
     }
 
     #[test]

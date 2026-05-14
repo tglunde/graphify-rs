@@ -116,7 +116,13 @@ fn build_user_prompt(content: &str, file_type: &str) -> String {
         content
     };
 
-    format!("Extract all entities and relationships from this {file_type}:\n\n{truncated}")
+    let is_truncated = content.len() > max_chars;
+    let note = if is_truncated {
+        "\n\n[NOTE: This file was truncated — only the first portion is shown. Extract entities only from the visible portion.]"
+    } else {
+        ""
+    };
+    format!("Extract all entities and relationships from this {file_type}:\n\n{truncated}{note}")
 }
 
 // ---------------------------------------------------------------------------
