@@ -4,6 +4,8 @@
 //! for Python, JavaScript, TypeScript, Rust, Go, Java, C, C++, Ruby, C#, and Dart.
 //! Falls back gracefully to the regex-based extractor for unsupported languages.
 
+mod handlers;
+mod imports;
 mod treesitter_config;
 
 pub use treesitter_config::TsConfig;
@@ -167,7 +169,7 @@ fn extract_with_treesitter(
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[allow(clippy::too_many_arguments)]
-fn walk_node(
+pub(crate) fn walk_node(
     node: Node,
     source: &[u8],
     config: &TsConfig,
@@ -193,7 +195,7 @@ fn walk_node(
                 .map(|n| node_text(n, source))
                 .unwrap_or_default();
             if method_name == "require" || method_name == "require_relative" {
-                extract_import(node, source, file_nid, str_path, lang, edges, nodes);
+                imports::extract_import(node, source, file_nid, str_path, lang, edges, nodes);
                 return;
             }
             // Not a require call, fall through to normal processing
@@ -203,12 +205,12 @@ fn walk_node(
                 .map(|n| node_text(n, source))
                 .unwrap_or_default();
             if matches!(target.as_str(), "import" | "use" | "require" | "alias") {
-                extract_import(node, source, file_nid, str_path, lang, edges, nodes);
+                imports::extract_import(node, source, file_nid, str_path, lang, edges, nodes);
                 return;
             }
             // Not an import call — fall through to class/function checks
         } else {
-            extract_import(node, source, file_nid, str_path, lang, edges, nodes);
+            imports::extract_import(node, source, file_nid, str_path, lang, edges, nodes);
             return; // Don't recurse into import children
         }
     }
@@ -223,7 +225,7 @@ fn walk_node(
             if target != "defmodule" && target != "defprotocol" && target != "defimpl" {
                 // Not a module definition — skip class handling
             } else {
-                handle_class_like(
+                handlers::handle_class_like(
                     node,
                     source,
                     config,
@@ -239,7 +241,7 @@ fn walk_node(
                 return;
             }
         } else {
-        handle_class_like(
+        handlers::handle_class_like(
             node,
             source,
             config,
@@ -264,7 +266,7 @@ fn walk_node(
                 .map(|n| node_text(n, source))
                 .unwrap_or_default();
             if matches!(target.as_str(), "def" | "defp" | "defmacro" | "defmacrop" | "defguard" | "defguardp" | "defdelegate") {
-                handle_function(
+                handlers::handle_function(
                     node,
                     source,
                     config,
@@ -282,7 +284,7 @@ fn walk_node(
             }
             // Not a function definition — fall through to recursion
         } else {
-        handle_function(
+        handlers::handle_function(
             node,
             source,
             config,
@@ -321,887 +323,16 @@ fn walk_node(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Class-like handler (class, struct, enum, trait, impl, type_declaration)
-// ═══════════════════════════════════════════════════════════════════════════
-
-#[allow(clippy::too_many_arguments)]
-fn handle_class_like(
-    node: Node,
-    source: &[u8],
-    config: &TsConfig,
-    lang: &str,
-    file_nid: &str,
-    stem: &str,
-    str_path: &str,
-    nodes: &mut Vec<GraphNode>,
-    edges: &mut Vec<GraphEdge>,
-    seen_ids: &mut HashSet<String>,
-    function_bodies: &mut Vec<(String, usize, usize)>,
-) {
-    let kind = node.kind();
-
-    // For Go type_declaration, we need to dig into the type_spec child
-    if lang == "go" && kind == "type_declaration" {
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "type_spec" {
-                handle_go_type_spec(
-                    child,
-                    source,
-                    config,
-                    lang,
-                    file_nid,
-                    stem,
-                    str_path,
-                    nodes,
-                    edges,
-                    seen_ids,
-                    function_bodies,
-                );
-            }
-        }
-        return;
-    }
-
-    // Rust impl_item: extract methods inside, create "implements" edges
-    if lang == "rust" && kind == "impl_item" {
-        handle_rust_impl(
-            node,
-            source,
-            config,
-            lang,
-            file_nid,
-            stem,
-            str_path,
-            nodes,
-            edges,
-            seen_ids,
-            function_bodies,
-        );
-        return;
-    }
-
-    // Standard class/struct/enum/trait
-    let class_field = config.class_name_field.unwrap_or(config.name_field);
-    let name = match get_name(node, source, class_field) {
-        Some(n) => n,
-        None => return,
-    };
-    let line = node.start_position().row + 1;
-    let class_nid = make_id(&[str_path, &name]);
-
-    let node_type = classify_class_kind(kind, lang);
-
-    if seen_ids.insert(class_nid.clone()) {
-        nodes.push(GraphNode {
-            id: class_nid.clone(),
-            label: name.clone(),
-            source_file: str_path.to_string(),
-            source_location: Some(format!("L{line}")),
-            node_type,
-            community: None,
-            extra: HashMap::new(),
-        });
-        edges.push(make_edge(file_nid, &class_nid, "defines", str_path, line));
-    }
-
-    // Recurse into body to find methods
-    if let Some(body) = node.child_by_field_name(config.body_field) {
-        let mut cursor = body.walk();
-        for child in body.children(&mut cursor) {
-            walk_node(
-                child,
-                source,
-                config,
-                lang,
-                file_nid,
-                stem,
-                str_path,
-                nodes,
-                edges,
-                seen_ids,
-                function_bodies,
-                Some(&class_nid),
-            );
-        }
-    }
-}
-
-fn classify_class_kind(kind: &str, lang: &str) -> NodeType {
-    match kind {
-        // Rust
-        "struct_item" => NodeType::Struct,
-        "enum_item" => NodeType::Enum,
-        "trait_item" => NodeType::Trait,
-        // C / C++
-        "struct_specifier" => NodeType::Struct,
-        "enum_specifier" => NodeType::Enum,
-        "namespace_definition" => NodeType::Namespace,
-        // C#
-        "struct_declaration" => NodeType::Struct,
-        "enum_declaration" => match lang {
-            "csharp" | "java" | "dart" => NodeType::Enum,
-            _ => NodeType::Enum,
-        },
-        // Java / C#
-        "interface_declaration" => NodeType::Interface,
-        // Dart
-        "mixin_declaration" | "extension_declaration" => NodeType::Class,
-        // Ruby
-        "module" => NodeType::Module,
-        // C (type_definition is used for typedef'd structs/enums)
-        "type_definition" => NodeType::Struct,
-        // Default
-        _ => NodeType::Class,
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn handle_go_type_spec(
-    node: Node,
-    source: &[u8],
-    config: &TsConfig,
-    lang: &str,
-    file_nid: &str,
-    stem: &str,
-    str_path: &str,
-    nodes: &mut Vec<GraphNode>,
-    edges: &mut Vec<GraphEdge>,
-    seen_ids: &mut HashSet<String>,
-    function_bodies: &mut Vec<(String, usize, usize)>,
-) {
-    let name = match get_name(node, source, "name") {
-        Some(n) => n,
-        None => return,
-    };
-    let line = node.start_position().row + 1;
-    let nid = make_id(&[str_path, &name]);
-
-    // Determine struct vs interface by looking at the type child
-    let node_type = {
-        let mut nt = NodeType::Struct;
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            match child.kind() {
-                "interface_type" => {
-                    nt = NodeType::Interface;
-                    break;
-                }
-                "struct_type" => {
-                    nt = NodeType::Struct;
-                    break;
-                }
-                _ => {}
-            }
-        }
-        nt
-    };
-
-    if seen_ids.insert(nid.clone()) {
-        nodes.push(GraphNode {
-            id: nid.clone(),
-            label: name.clone(),
-            source_file: str_path.to_string(),
-            source_location: Some(format!("L{line}")),
-            node_type,
-            community: None,
-            extra: HashMap::new(),
-        });
-        edges.push(make_edge(file_nid, &nid, "defines", str_path, line));
-    }
-
-    // Recurse into body for any child methods (Go doesn't nest methods in struct body,
-    // but interfaces have method specs)
-    if let Some(body) = node.child_by_field_name(config.body_field) {
-        let mut cursor = body.walk();
-        for child in body.children(&mut cursor) {
-            walk_node(
-                child,
-                source,
-                config,
-                lang,
-                file_nid,
-                stem,
-                str_path,
-                nodes,
-                edges,
-                seen_ids,
-                function_bodies,
-                Some(&nid),
-            );
-        }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn handle_rust_impl(
-    node: Node,
-    source: &[u8],
-    config: &TsConfig,
-    lang: &str,
-    file_nid: &str,
-    stem: &str,
-    str_path: &str,
-    nodes: &mut Vec<GraphNode>,
-    edges: &mut Vec<GraphEdge>,
-    seen_ids: &mut HashSet<String>,
-    function_bodies: &mut Vec<(String, usize, usize)>,
-) {
-    // `impl [Trait for] Type { ... }`
-    // The type is the `type` field, the trait is the `trait` field
-    let type_name = node
-        .child_by_field_name("type")
-        .map(|n| node_text(n, source));
-    let trait_name = node
-        .child_by_field_name("trait")
-        .map(|n| node_text(n, source));
-
-    let impl_target_nid = type_name.as_ref().map(|tn| make_id(&[str_path, tn]));
-
-    // Create an "implements" edge if trait impl
-    if let (Some(trait_n), Some(target_nid)) = (&trait_name, &impl_target_nid) {
-        let line = node.start_position().row + 1;
-        let trait_nid = make_id(&[str_path, trait_n]);
-        edges.push(GraphEdge {
-            source: target_nid.clone(),
-            target: trait_nid,
-            relation: "implements".to_string(),
-            confidence: Confidence::Extracted,
-            confidence_score: Confidence::Extracted.default_score(),
-            source_file: str_path.to_string(),
-            source_location: Some(format!("L{line}")),
-            weight: 1.0,
-            extra: HashMap::new(),
-        });
-    }
-
-    // Recurse into body to find methods, treating them as methods of the impl target
-    if let Some(body) = node.child_by_field_name(config.body_field) {
-        let class_nid = impl_target_nid.as_deref();
-        let mut cursor = body.walk();
-        for child in body.children(&mut cursor) {
-            walk_node(
-                child,
-                source,
-                config,
-                lang,
-                file_nid,
-                stem,
-                str_path,
-                nodes,
-                edges,
-                seen_ids,
-                function_bodies,
-                class_nid,
-            );
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Function handler
-// ═══════════════════════════════════════════════════════════════════════════
-
-#[allow(clippy::too_many_arguments)]
-/// Normalize Dart function names: handle getters/setters and named constructors
-fn normalize_dart_function_name(lang: &str, func_name: &str) -> String {
-    if lang != "dart" {
-        return func_name.to_string();
-    }
-
-    let mut name = func_name;
-
-    // Strip "get "/"set " prefix for Dart getters/setters (e.g., "get value" -> "value")
-    if name.starts_with("get ") || name.starts_with("set ") {
-        name = &name[4..];
-    }
-
-    name.to_string()
-}
-
-#[allow(clippy::too_many_arguments)]
-fn handle_function(
-    node: Node,
-    source: &[u8],
-    config: &TsConfig,
-    _lang: &str,
-    file_nid: &str,
-    _stem: &str,
-    str_path: &str,
-    nodes: &mut Vec<GraphNode>,
-    edges: &mut Vec<GraphEdge>,
-    seen_ids: &mut HashSet<String>,
-    function_bodies: &mut Vec<(String, usize, usize)>,
-    parent_class_nid: Option<&str>,
-) {
-    // For JS arrow functions assigned to a variable, the name is on the parent
-    // `variable_declarator` node. But for function_declaration, method_definition,
-    // etc., the name is directly on the node.
-    let func_name = match get_name(node, source, config.name_field) {
-        Some(n) => n,
-        None => {
-            // For JS arrow functions, try to get name from parent variable_declarator
-            if node.kind() == "arrow_function" {
-                if let Some(parent) = node.parent() {
-                    if parent.kind() == "variable_declarator" {
-                        match get_name(parent, source, "name") {
-                            Some(n) => n,
-                            None => return,
-                        }
-                    } else {
-                        return;
-                    }
-                } else {
-                    return;
-                }
-            } else if _lang == "dart" {
-                // Dart function_signature/method_signature may not have a name field;
-                // try to find the first identifier child as the function name
-                let mut found = None;
-                let mut cursor = node.walk();
-                for child in node.children(&mut cursor) {
-                    if child.kind() == "identifier" {
-                        found = Some(node_text(child, source));
-                        break;
-                    }
-                }
-                match found {
-                    Some(n) if !n.is_empty() => n,
-                    _ => return,
-                }
-            } else {
-                return;
-            }
-        }
-    };
-
-    let normalized_name = normalize_dart_function_name(_lang, &func_name);
-    let line = node.start_position().row + 1;
-
-    let (func_nid, label, node_type, relation) = if let Some(class_nid) = parent_class_nid {
-        let nid = make_id(&[class_nid, &normalized_name]);
-        (
-            nid,
-            format!(".{normalized_name}()"),
-            NodeType::Method,
-            "defines",
-        )
-    } else {
-        let nid = make_id(&[str_path, &normalized_name]);
-        (
-            nid,
-            format!("{normalized_name}()"),
-            NodeType::Function,
-            "defines",
-        )
-    };
-
-    if seen_ids.insert(func_nid.clone()) {
-        nodes.push(GraphNode {
-            id: func_nid.clone(),
-            label,
-            source_file: str_path.to_string(),
-            source_location: Some(format!("L{line}")),
-            node_type,
-            community: None,
-            extra: HashMap::new(),
-        });
-
-        let parent_nid = parent_class_nid.unwrap_or(file_nid);
-        edges.push(make_edge(parent_nid, &func_nid, relation, str_path, line));
-    }
-
-    // Record the function body bytes for call-graph inference
-    if let Some(body) = node.child_by_field_name(config.body_field) {
-        function_bodies.push((func_nid, body.start_byte(), body.end_byte()));
-    } else {
-        // Fallback: use the whole node as body
-        function_bodies.push((func_nid, node.start_byte(), node.end_byte()));
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Import handler
-// ═══════════════════════════════════════════════════════════════════════════
-
-fn extract_import(
-    node: Node,
-    source: &[u8],
-    file_nid: &str,
-    str_path: &str,
-    lang: &str,
-    edges: &mut Vec<GraphEdge>,
-    nodes: &mut Vec<GraphNode>,
-) {
-    let line = node.start_position().row + 1;
-    let import_text = node_text(node, source);
-
-    match lang {
-        "python" => extract_python_import(node, source, file_nid, str_path, line, edges, nodes),
-        "javascript" | "typescript" => {
-            extract_js_import(node, source, file_nid, str_path, line, edges, nodes);
-        }
-        "rust" => {
-            // `use foo::bar::Baz;` → module = full text after "use"
-            let module = import_text
-                .strip_prefix("use ")
-                .unwrap_or(&import_text)
-                .trim_end_matches(';')
-                .trim();
-            add_import_node(
-                nodes,
-                edges,
-                file_nid,
-                str_path,
-                line,
-                module,
-                NodeType::Module,
-            );
-        }
-        "go" => {
-            extract_go_import(node, source, file_nid, str_path, line, edges, nodes);
-        }
-        "java" => {
-            // `import java.util.List;` or `import static java.util.Arrays.asList;`
-            let text = node_text(node, source);
-            let after_import = text.trim().strip_prefix("import ").unwrap_or(text.trim());
-            let module = after_import
-                .strip_prefix("static ")
-                .unwrap_or(after_import)
-                .trim_end_matches(';')
-                .trim();
-            add_import_node(
-                nodes,
-                edges,
-                file_nid,
-                str_path,
-                line,
-                module,
-                NodeType::Module,
-            );
-        }
-        "c" | "cpp" => {
-            // `#include <stdio.h>` or `#include "myheader.h"`
-            let text = node_text(node, source);
-            let module = text
-                .trim()
-                .strip_prefix("#include")
-                .unwrap_or(&text)
-                .trim()
-                .trim_matches(&['<', '>', '"'][..])
-                .trim();
-            add_import_node(
-                nodes,
-                edges,
-                file_nid,
-                str_path,
-                line,
-                module,
-                NodeType::Module,
-            );
-        }
-        "csharp" => {
-            // `using System.Collections.Generic;`
-            let text = node_text(node, source);
-            let module = text
-                .trim()
-                .strip_prefix("using ")
-                .unwrap_or(&text)
-                .trim_end_matches(';')
-                .trim();
-            add_import_node(
-                nodes,
-                edges,
-                file_nid,
-                str_path,
-                line,
-                module,
-                NodeType::Module,
-            );
-        }
-        "ruby" => {
-            extract_ruby_import(node, source, file_nid, str_path, line, edges, nodes);
-        }
-        "dart" => {
-            extract_dart_import(node, source, file_nid, str_path, line, edges, nodes);
-        }
-        _ => {
-            add_import_node(
-                nodes,
-                edges,
-                file_nid,
-                str_path,
-                line,
-                &import_text,
-                NodeType::Module,
-            );
-        }
-    }
-}
-
-fn extract_python_import(
-    node: Node,
-    source: &[u8],
-    file_nid: &str,
-    str_path: &str,
-    line: usize,
-    edges: &mut Vec<GraphEdge>,
-    nodes: &mut Vec<GraphNode>,
-) {
-    // `import_statement`: `import os` → child "dotted_name"
-    // `import_from_statement`: `from pathlib import Path` → module_name + name children
-    let kind = node.kind();
-
-    if kind == "import_from_statement" {
-        let module = node
-            .child_by_field_name("module_name")
-            .map(|n| node_text(n, source))
-            .unwrap_or_default();
-        // Track how many edges existed before this statement
-        let edges_before = edges.len();
-        // Iterate over named import children
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "dotted_name" || child.kind() == "aliased_import" {
-                let name_node = if child.kind() == "aliased_import" {
-                    child.child_by_field_name("name")
-                } else {
-                    Some(child)
-                };
-                if let Some(nn) = name_node {
-                    let name = node_text(nn, source);
-                    if name != module {
-                        let full = if module.is_empty() {
-                            name
-                        } else {
-                            format!("{module}.{name}")
-                        };
-                        add_import_node(
-                            nodes,
-                            edges,
-                            file_nid,
-                            str_path,
-                            line,
-                            &full,
-                            NodeType::Module,
-                        );
-                    }
-                }
-            }
-        }
-        // If no names were added by this statement (e.g. `from x import *`), add the module
-        let new_edges = edges.len() - edges_before;
-        if new_edges == 0 && !module.is_empty() {
-            add_import_node(
-                nodes,
-                edges,
-                file_nid,
-                str_path,
-                line,
-                &module,
-                NodeType::Module,
-            );
-        }
-    } else {
-        // `import os`, `import os.path`
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == "dotted_name" || child.kind() == "aliased_import" {
-                let name_node = if child.kind() == "aliased_import" {
-                    child.child_by_field_name("name")
-                } else {
-                    Some(child)
-                };
-                if let Some(nn) = name_node {
-                    let name = node_text(nn, source);
-                    add_import_node(
-                        nodes,
-                        edges,
-                        file_nid,
-                        str_path,
-                        line,
-                        &name,
-                        NodeType::Module,
-                    );
-                }
-            }
-        }
-    }
-}
-
-fn extract_js_import(
-    node: Node,
-    source: &[u8],
-    file_nid: &str,
-    str_path: &str,
-    line: usize,
-    edges: &mut Vec<GraphEdge>,
-    nodes: &mut Vec<GraphNode>,
-) {
-    // JS import: `import { X, Y } from 'module'` or `import X from 'module'`
-    // The source/module is in the `source` field
-    let module = node
-        .child_by_field_name("source")
-        .map(|n| {
-            let t = node_text(n, source);
-            t.trim_matches(&['"', '\''][..]).to_string()
-        })
-        .unwrap_or_default();
-
-    // Collect imported identifiers
-    let mut found_names = false;
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if child.kind() == "import_clause" {
-            let mut inner_cursor = child.walk();
-            for inner in child.children(&mut inner_cursor) {
-                match inner.kind() {
-                    "identifier" => {
-                        let name = node_text(inner, source);
-                        let full = format!("{module}/{name}");
-                        add_import_node(
-                            nodes,
-                            edges,
-                            file_nid,
-                            str_path,
-                            line,
-                            &full,
-                            NodeType::Module,
-                        );
-                        found_names = true;
-                    }
-                    "named_imports" => {
-                        let mut spec_cursor = inner.walk();
-                        for spec in inner.children(&mut spec_cursor) {
-                            if spec.kind() == "import_specifier" {
-                                let name = spec
-                                    .child_by_field_name("name").map_or_else(|| node_text(spec, source), |n| node_text(n, source));
-                                let full = format!("{module}/{name}");
-                                add_import_node(
-                                    nodes,
-                                    edges,
-                                    file_nid,
-                                    str_path,
-                                    line,
-                                    &full,
-                                    NodeType::Module,
-                                );
-                                found_names = true;
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    if !found_names && !module.is_empty() {
-        add_import_node(
-            nodes,
-            edges,
-            file_nid,
-            str_path,
-            line,
-            &module,
-            NodeType::Module,
-        );
-    }
-}
-
-fn extract_go_import(
-    node: Node,
-    source: &[u8],
-    file_nid: &str,
-    str_path: &str,
-    line: usize,
-    edges: &mut Vec<GraphEdge>,
-    nodes: &mut Vec<GraphNode>,
-) {
-    // Go imports: `import "fmt"` or `import ( "fmt" \n "os" )`
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        match child.kind() {
-            "import_spec" => {
-                if let Some(path_node) = child.child_by_field_name("path") {
-                    let module = node_text(path_node, source).trim_matches('"').to_string();
-                    let spec_line = child.start_position().row + 1;
-                    add_import_node(
-                        nodes,
-                        edges,
-                        file_nid,
-                        str_path,
-                        spec_line,
-                        &module,
-                        NodeType::Package,
-                    );
-                }
-            }
-            "import_spec_list" => {
-                let mut inner = child.walk();
-                for spec in child.children(&mut inner) {
-                    if spec.kind() == "import_spec"
-                        && let Some(path_node) = spec.child_by_field_name("path")
-                    {
-                        let module = node_text(path_node, source).trim_matches('"').to_string();
-                        let spec_line = spec.start_position().row + 1;
-                        add_import_node(
-                            nodes,
-                            edges,
-                            file_nid,
-                            str_path,
-                            spec_line,
-                            &module,
-                            NodeType::Package,
-                        );
-                    }
-                }
-            }
-            "interpreted_string_literal" => {
-                // Single import: `import "fmt"`
-                let module = node_text(child, source).trim_matches('"').to_string();
-                add_import_node(
-                    nodes,
-                    edges,
-                    file_nid,
-                    str_path,
-                    line,
-                    &module,
-                    NodeType::Package,
-                );
-            }
-            _ => {}
-        }
-    }
-}
-
-fn extract_ruby_import(
-    node: Node,
-    source: &[u8],
-    file_nid: &str,
-    str_path: &str,
-    line: usize,
-    edges: &mut Vec<GraphEdge>,
-    nodes: &mut Vec<GraphNode>,
-) {
-    // Ruby imports are method calls: `require 'json'`, `require_relative 'helper'`
-    // The tree-sitter node is a `call` with method=identifier("require"/"require_relative")
-    // and arguments containing a string.
-    let method_name = node
-        .child_by_field_name("method")
-        .map(|n| node_text(n, source))
-        .unwrap_or_default();
-
-    if method_name != "require" && method_name != "require_relative" {
-        return; // Not an import call, skip
-    }
-
-    // Extract the argument string
-    if let Some(args) = node.child_by_field_name("arguments") {
-        let mut cursor = args.walk();
-        for child in args.children(&mut cursor) {
-            let kind = child.kind();
-            if kind == "string" || kind == "string_literal" {
-                let raw = node_text(child, source);
-                let module = raw.trim_matches(&['"', '\''][..]).to_string();
-                if !module.is_empty() {
-                    add_import_node(
-                        nodes,
-                        edges,
-                        file_nid,
-                        str_path,
-                        line,
-                        &module,
-                        NodeType::Module,
-                    );
-                }
-                return;
-            }
-        }
-    }
-
-    // Fallback: try parsing from the raw text
-    let text = node_text(node, source);
-    let module = text
-        .trim()
-        .strip_prefix("require_relative ")
-        .or_else(|| text.trim().strip_prefix("require "))
-        .unwrap_or(&text)
-        .trim_matches(&['"', '\'', ' '][..]);
-    if !module.is_empty() {
-        add_import_node(
-            nodes,
-            edges,
-            file_nid,
-            str_path,
-            line,
-            module,
-            NodeType::Module,
-        );
-    }
-}
-
-fn extract_dart_import(
-    node: Node,
-    source: &[u8],
-    file_nid: &str,
-    str_path: &str,
-    line: usize,
-    edges: &mut Vec<GraphEdge>,
-    nodes: &mut Vec<GraphNode>,
-) {
-    // Dart: `import 'dart:async';`, `part 'src/models.dart';`
-    let text = node_text(node, source);
-    let trimmed = text.trim().trim_end_matches(';').trim();
-
-    // Strip keyword prefix
-    let module = trimmed
-        .strip_prefix("part of ")
-        .or_else(|| trimmed.strip_prefix("part "))
-        .or_else(|| trimmed.strip_prefix("import "))
-        .or_else(|| trimmed.strip_prefix("export "))
-        .unwrap_or(trimmed)
-        .trim()
-        .trim_matches(&['"', '\''][..])
-        // Remove `deferred as X`, `as X`, `show X`, `hide X` suffixes
-        .split(" deferred ")
-        .next()
-        .unwrap_or("")
-        .split(" as ")
-        .next()
-        .unwrap_or("")
-        .split(" show ")
-        .next()
-        .unwrap_or("")
-        .split(" hide ")
-        .next()
-        .unwrap_or("")
-        .trim();
-
-    if !module.is_empty() {
-        add_import_node(
-            nodes,
-            edges,
-            file_nid,
-            str_path,
-            line,
-            module,
-            NodeType::Module,
-        );
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Extract text from a tree-sitter node.
-fn node_text(node: Node, source: &[u8]) -> String {
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn node_text(node: Node, source: &[u8]) -> String {
     node.utf8_text(source).unwrap_or("").to_string()
 }
 
 /// Get the name of a definition node via its field name.
-fn get_name(node: Node, source: &[u8], field: &str) -> Option<String> {
+pub(crate) fn get_name(node: Node, source: &[u8], field: &str) -> Option<String> {
     let name_node = node.child_by_field_name(field)?;
     // For C/C++ declarators, unwrap nested declarators to find the identifier
     let text = unwrap_declarator_name(name_node, source);
@@ -1210,7 +341,7 @@ fn get_name(node: Node, source: &[u8], field: &str) -> Option<String> {
 
 /// Recursively unwrap C/C++ declarators (function_declarator, pointer_declarator, etc.)
 /// to find the underlying identifier name.
-fn unwrap_declarator_name(node: Node, source: &[u8]) -> String {
+pub(crate) fn unwrap_declarator_name(node: Node, source: &[u8]) -> String {
     match node.kind() {
         "function_declarator"
         | "pointer_declarator"
@@ -1240,39 +371,8 @@ fn unwrap_declarator_name(node: Node, source: &[u8]) -> String {
     }
 }
 
-fn add_import_node(
-    nodes: &mut Vec<GraphNode>,
-    edges: &mut Vec<GraphEdge>,
-    file_nid: &str,
-    str_path: &str,
-    line: usize,
-    module: &str,
-    node_type: NodeType,
-) {
-    let import_id = make_id(&[str_path, "import", module]);
-    nodes.push(GraphNode {
-        id: import_id.clone(),
-        label: module.to_string(),
-        source_file: str_path.to_string(),
-        source_location: Some(format!("L{line}")),
-        node_type,
-        community: None,
-        extra: HashMap::new(),
-    });
-    edges.push(GraphEdge {
-        source: file_nid.to_string(),
-        target: import_id,
-        relation: "imports".to_string(),
-        confidence: Confidence::Extracted,
-        confidence_score: Confidence::Extracted.default_score(),
-        source_file: str_path.to_string(),
-        source_location: Some(format!("L{line}")),
-        weight: 1.0,
-        extra: HashMap::new(),
-    });
-}
 
-fn make_edge(
+pub(crate) fn make_edge(
     source_id: &str,
     target_id: &str,
     relation: &str,
