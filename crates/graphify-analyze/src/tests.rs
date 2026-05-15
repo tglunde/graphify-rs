@@ -65,8 +65,6 @@ fn build_graph(nodes: &[GraphNode], edges: &[GraphEdge]) -> KnowledgeGraph {
     g
 }
 
-// -- god_nodes ---------------------------------------------------------
-
 #[test]
 fn god_nodes_empty_graph() {
     let g = KnowledgeGraph::new();
@@ -124,8 +122,6 @@ fn god_nodes_skips_method_stubs() {
     assert!(gods.iter().all(|g| g.id != "stub"));
 }
 
-// -- surprising_connections -------------------------------------------
-
 #[test]
 fn surprising_connections_empty() {
     let g = KnowledgeGraph::new();
@@ -159,8 +155,6 @@ fn ambiguous_edge_is_surprising() {
     let surprises = surprising_connections(&g, &communities, 10);
     assert!(!surprises.is_empty());
 }
-
-// -- suggest_questions ------------------------------------------------
 
 #[test]
 fn suggest_questions_empty() {
@@ -199,8 +193,6 @@ fn suggest_questions_isolated_node() {
     assert!(has_isolated);
 }
 
-// -- graph_diff -------------------------------------------------------
-
 #[test]
 fn graph_diff_identical() {
     let g = build_graph(
@@ -231,8 +223,6 @@ fn graph_diff_removed_node() {
     let summary = diff.get("summary").unwrap();
     assert_eq!(summary["nodes_removed"], 1);
 }
-
-// -- helpers ----------------------------------------------------------
 
 #[test]
 fn is_file_node_true() {
@@ -336,7 +326,6 @@ fn community_bridges_finds_cross_community_nodes() {
     let bridges = community_bridges(&g, &communities, 10);
     assert!(!bridges.is_empty(), "should find at least one bridge");
     // "bridge" and "c" are both bridge nodes; "c" has ratio 1.0, "bridge" has 0.33
-    // Just verify "bridge" appears somewhere
     assert!(
         bridges.iter().any(|b| b.id == "bridge"),
         "bridge node should appear in results"
@@ -363,8 +352,6 @@ fn community_bridges_empty_when_single_community() {
     assert!(bridges.is_empty(), "no bridges in single community");
 }
 
-// ----- PageRank tests -----
-
 #[test]
 fn pagerank_empty_graph() {
     let g = KnowledgeGraph::new();
@@ -374,7 +361,6 @@ fn pagerank_empty_graph() {
 
 #[test]
 fn pagerank_star_topology() {
-    // Center node connected to 5 leaves — center should rank highest
     let mut nodes = vec![simple_node("center")];
     let mut edges = vec![];
     for i in 0..5 {
@@ -400,11 +386,8 @@ fn pagerank_returns_top_n() {
     assert_eq!(result.len(), 5);
 }
 
-// ----- Cycle detection tests -----
-
 #[test]
 fn detect_cycles_no_cycles() {
-    // Tree structure: no cycles
     let g = build_graph(
         &[simple_node("a"), simple_node("b"), simple_node("c")],
         &[simple_edge("a", "b"), simple_edge("b", "c")],
@@ -415,7 +398,6 @@ fn detect_cycles_no_cycles() {
 
 #[test]
 fn detect_cycles_finds_triangle() {
-    // a → b → c → a (using "calls" edges)
     let g = build_graph(
         &[simple_node("a"), simple_node("b"), simple_node("c")],
         &[

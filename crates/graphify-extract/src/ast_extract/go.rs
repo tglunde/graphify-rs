@@ -18,7 +18,6 @@ pub(crate) fn extract_go(path: &Path, source: &str) -> ExtractionResult {
     let lines: Vec<&str> = source.lines().collect();
     let ps = path_str(path);
 
-    // Type definitions: `type Foo struct {` / `type Foo interface {`
     for cap in RE_GO_TYPE.captures_iter(source) {
         let name = &cap[1];
         let kind = &cap[2];
@@ -39,7 +38,6 @@ pub(crate) fn extract_go(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Functions and methods: `func Foo(` / `func (r *Recv) Foo(`
     let mut functions: Vec<(String, String, usize, usize)> = Vec::new();
     let func_matches: Vec<_> = RE_GO_FUNC.captures_iter(source).collect();
     for (i, cap) in func_matches.iter().enumerate() {
@@ -47,7 +45,6 @@ pub(crate) fn extract_go(path: &Path, source: &str) -> ExtractionResult {
         let start_line = line_of(source, cap);
         let end_line = end_line_at(source, func_matches.get(i + 1));
 
-        // Methods have a receiver
         let full_match = full_match(cap);
         let node_type = if full_match.contains('(') && full_match.find('(') < full_match.find(&name)
         {
@@ -69,7 +66,6 @@ pub(crate) fn extract_go(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Imports: `import "fmt"` / `import ( "fmt" "os" )`
     for cap in RE_GO_IMPORT_SINGLE.captures_iter(source) {
         let module = &cap[1];
         let line = line_of(source, &cap);
@@ -122,6 +118,3 @@ pub(crate) fn extract_go(path: &Path, source: &str) -> ExtractionResult {
 
     result
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Java

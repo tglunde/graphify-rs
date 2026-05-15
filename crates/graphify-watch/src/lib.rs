@@ -69,7 +69,6 @@ fn rebuild(
 ) -> Result<(), WatchError> {
     let cache_dir = output_dir.join("cache");
 
-    // ── Step 0: Invalidate cache for changed files ──
     if let Some(changed) = changed_files {
         for path in changed {
             let _ = graphify_cache::invalidate_cached(path, root, &cache_dir);
@@ -80,7 +79,6 @@ fn rebuild(
         );
     }
 
-    // ── Step 1: Detect files ──
     info!("rebuild: detecting files...");
     let detection = graphify_detect::detect(root);
     info!(
@@ -88,7 +86,6 @@ fn rebuild(
         detection.total_files, detection.total_words
     );
 
-    // ── Step 2: Extract AST ──
     let code_files: Vec<PathBuf> = detection
         .files
         .get(&graphify_detect::FileType::Code)
@@ -118,7 +115,6 @@ fn rebuild(
             ast_result.hyperedges.extend(cached.hyperedges);
             continue;
         }
-        // Extract fresh, catching panics
         if let Ok(fresh) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             graphify_extract::extract(std::slice::from_ref(file_path))
         })) {
@@ -149,7 +145,6 @@ fn rebuild(
 
     let extractions = vec![ast_result];
 
-    // ── Step 3: Build graph ──
     info!("rebuild: building graph...");
     let graph = graphify_build::build(&extractions)
         .map_err(|e| WatchError::Rebuild(format!("build failed: {e}")))?;
@@ -159,7 +154,6 @@ fn rebuild(
         graph.edge_count()
     );
 
-    // ── Step 4: Cluster ──
     info!("rebuild: detecting communities...");
     let communities = graphify_cluster::cluster(&graph);
     let cohesion = graphify_cluster::score_all(&graph, &communities);
@@ -176,13 +170,11 @@ fn rebuild(
         .collect();
     info!("rebuild: {} communities detected", communities.len());
 
-    // ── Step 5: Analyze ──
     info!("rebuild: analyzing...");
     let god_list = graphify_analyze::god_nodes(&graph, 10);
     let surprise_list = graphify_analyze::surprising_connections(&graph, &communities, 5);
     let questions = graphify_analyze::suggest_questions(&graph, &communities, &community_labels, 7);
 
-    // ── Step 6: Export all formats ──
     std::fs::create_dir_all(output_dir)
         .map_err(|e| WatchError::Rebuild(format!("create output dir: {e}")))?;
 
@@ -193,7 +185,6 @@ fn rebuild(
     let _ = graphify_export::export_svg(&graph, &communities, output_dir);
     let _ = graphify_export::export_wiki(&graph, &communities, &community_labels, output_dir);
 
-    // Report
     let detection_json = serde_json::json!({
         "total_files": detection.total_files,
         "total_words": detection.total_words,
@@ -223,7 +214,6 @@ fn rebuild(
         let _ = std::fs::write(&report_path, &report);
     }
 
-    // Save manifest
     let manifest_path = output_dir.join(".graphify_manifest.json");
     let manifest = graphify_detect::Manifest {
         files: detection
@@ -276,7 +266,6 @@ pub async fn watch_directory(root: &Path, output_dir: &Path) -> Result<(), Watch
     );
     println!("Watching {} for changes...", root.display());
 
-    // Run initial build (full)
     println!("Running initial build...");
     let root_clone = root.to_path_buf();
     let out_clone = output_dir.to_path_buf();
@@ -317,10 +306,6 @@ pub async fn watch_directory(root: &Path, output_dir: &Path) -> Result<(), Watch
 
     Ok(())
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -377,7 +362,6 @@ mod tests {
     fn test_rebuild_empty_dir() {
         let dir = tempfile::tempdir().unwrap();
         let output = tempfile::tempdir().unwrap();
-        // Should succeed with empty directory (no code files)
         let result = rebuild(dir.path(), output.path(), None);
         assert!(result.is_ok());
     }
@@ -402,7 +386,6 @@ mod tests {
         let result = rebuild(dir.path(), output.path(), None);
         assert!(result.is_ok());
 
-        // Check that output files were created
         assert!(output.path().join("graph.json").exists());
         assert!(output.path().join("graph.html").exists());
         assert!(output.path().join("GRAPH_REPORT.md").exists());
@@ -420,11 +403,9 @@ mod tests {
         )
         .unwrap();
 
-        // Initial full build
         let result = rebuild(dir.path(), output.path(), None);
         assert!(result.is_ok());
 
-        // Incremental rebuild with changed files
         let changed = vec![src.join("main.rs")];
         let result = rebuild(dir.path(), output.path(), Some(&changed));
         assert!(result.is_ok());

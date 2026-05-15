@@ -20,10 +20,6 @@ use serde::Deserialize;
 
 pub use provider::{AuthType, LLMConfigRaw, LLMProvider, LLMProviderConfig};
 
-// ---------------------------------------------------------------------------
-// Shared response types
-// ---------------------------------------------------------------------------
-
 /// Entities and relationships extracted by the LLM.
 #[derive(Deserialize, Debug)]
 struct SemanticOutput {
@@ -56,10 +52,6 @@ fn default_relation() -> String {
     "related_to".to_string()
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
 /// Extract semantic concepts from a document, paper, or image using an LLM.
 ///
 /// Dispatches to the appropriate provider based on `config.provider`.
@@ -87,10 +79,6 @@ pub async fn extract_semantic(
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Prompt construction (shared)
-// ---------------------------------------------------------------------------
 
 fn build_system_prompt(file_type: &str) -> String {
     format!(
@@ -124,10 +112,6 @@ fn build_user_prompt(content: &str, file_type: &str) -> String {
     };
     format!("Extract all entities and relationships from this {file_type}:\n\n{truncated}{note}")
 }
-
-// ---------------------------------------------------------------------------
-// Response parsing (shared)
-// ---------------------------------------------------------------------------
 
 fn parse_semantic_response(text: &str, file_str: &str) -> Result<ExtractionResult> {
     let json_str = extract_json_block(text);
@@ -212,10 +196,6 @@ fn extract_json_block(text: &str) -> &str {
     }
     text.trim()
 }
-
-// ---------------------------------------------------------------------------
-// Tests (shared parsing logic)
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

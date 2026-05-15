@@ -19,7 +19,6 @@ pub(crate) fn extract_python(path: &Path, source: &str) -> ExtractionResult {
     let lines: Vec<&str> = source.lines().collect();
     let ps = path_str(path);
 
-    // Classes: `class Foo(Bar):`  or `class Foo:`
     let mut class_ids: HashMap<String, String> = HashMap::new();
     for cap in RE_PY_CLASS.captures_iter(source) {
         let name = &cap[2];
@@ -53,9 +52,7 @@ pub(crate) fn extract_python(path: &Path, source: &str) -> ExtractionResult {
         let node = make_node(&name, path, node_type, start_line);
         let node_id = node.id.clone();
 
-        // Determine parent: if indented, belong to nearest class above with less indent
         let parent_id = if indent > 0 {
-            // Find enclosing class by checking lines above for `class` with less indent
             let mut parent = None;
             for line_idx in (0..start_line.saturating_sub(1)).rev() {
                 if let Some(line) = lines.get(line_idx)
@@ -71,7 +68,6 @@ pub(crate) fn extract_python(path: &Path, source: &str) -> ExtractionResult {
             file_id.clone()
         };
 
-        // End line: next function at same or lower indent, or end of file
         let end_line = end_line_at(source, func_matches.get(i + 1));
 
         functions.push((name.clone(), node_id.clone(), start_line, end_line));
@@ -85,7 +81,6 @@ pub(crate) fn extract_python(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Imports: `import X` / `from X import Y`
     for cap in RE_PY_IMPORT.captures_iter(source) {
         let module = cap.get(1).map_or("", |m| m.as_str());
         let names_str = &cap[2];
@@ -121,7 +116,6 @@ pub(crate) fn extract_python(path: &Path, source: &str) -> ExtractionResult {
         }
     }
 
-    // Infer calls
     let call_edges = infer_calls(&functions, &lines, path);
     result.edges.extend(call_edges);
 
@@ -133,6 +127,3 @@ pub(crate) fn extract_python(path: &Path, source: &str) -> ExtractionResult {
     );
     result
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// JavaScript / TypeScript

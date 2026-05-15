@@ -32,10 +32,6 @@ pub(crate) fn tool_result_error(text: &str) -> Value {
     })
 }
 
-// ---------------------------------------------------------------------------
-// Tool handlers
-// ---------------------------------------------------------------------------
-
 pub(crate) fn handle_query_graph(graph: &KnowledgeGraph, args: &Value) -> Value {
     let question = args["question"].as_str().unwrap_or("");
     let budget = args["budget"].as_u64().unwrap_or(2000) as usize;
@@ -112,7 +108,6 @@ pub(crate) fn handle_get_neighbors(graph: &KnowledgeGraph, args: &Value) -> Valu
             continue; // skip the start node
         }
         if let Some(node) = graph.get_node(nid) {
-            // Find edges connecting to this neighbor
             let edge_count = edges
                 .iter()
                 .filter(|(s, t)| (s == node_id && t == nid) || (s == nid && t == node_id))
@@ -164,7 +159,6 @@ pub(crate) fn handle_get_community(graph: &KnowledgeGraph, args: &Value) -> Valu
         return tool_result_error(&format!("Community not found or empty: {community_id}"));
     }
 
-    // Sort by degree descending
     members.sort_by(|a, b| {
         let da = a["degree"].as_u64().unwrap_or(0);
         let db = b["degree"].as_u64().unwrap_or(0);
@@ -238,7 +232,6 @@ pub(crate) fn handle_shortest_path(graph: &KnowledgeGraph, args: &Value) -> Valu
         return tool_result_json(&result);
     }
 
-    // BFS shortest path
     let mut visited: HashSet<String> = HashSet::new();
     let mut parent: HashMap<String, String> = HashMap::new();
     let mut queue: VecDeque<String> = VecDeque::new();
@@ -267,7 +260,6 @@ pub(crate) fn handle_shortest_path(graph: &KnowledgeGraph, args: &Value) -> Valu
         ));
     }
 
-    // Reconstruct path
     let mut path = vec![target.to_string()];
     let mut current = target.to_string();
     while let Some(p) = parent.get(&current) {
@@ -394,7 +386,6 @@ pub(crate) fn handle_weighted_path(graph: &KnowledgeGraph, args: &Value) -> Valu
 }
 
 pub(crate) fn handle_community_bridges(graph: &KnowledgeGraph, args: &Value) -> Value {
-    // Build communities from node.community field
     let mut communities: HashMap<usize, Vec<String>> = HashMap::new();
     for node_id in graph.node_ids() {
         if let Some(node) = graph.get_node(&node_id)
@@ -476,7 +467,6 @@ pub(crate) fn handle_smart_summary(graph: &KnowledgeGraph, args: &Value) -> Valu
         _ => crate::SummaryLevel::Community,
     };
 
-    // Build communities map from graph node.community field
     let mut communities: HashMap<usize, Vec<String>> = HashMap::new();
     for node in graph.nodes() {
         let cid = node.community.unwrap_or(0);

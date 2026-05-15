@@ -12,10 +12,6 @@ fn dispatch_table_covers_all_languages() {
     assert_eq!(map.get(".mm"), Some(&"objc"));
 }
 
-// -----------------------------------------------------------------------
-// Helpers for cross-file import resolution tests
-// -----------------------------------------------------------------------
-
 fn make_test_node(id: &str, label: &str, source_file: &str, node_type: NodeType) -> GraphNode {
     GraphNode {
         id: id.to_string(),
@@ -41,10 +37,6 @@ fn make_test_edge(source: &str, target: &str, relation: &str, source_file: &str)
         extra: Default::default(),
     }
 }
-
-// -----------------------------------------------------------------------
-// JS/TS cross-file resolution
-// -----------------------------------------------------------------------
 
 #[test]
 fn jsts_cross_file_creates_uses_edges() {
@@ -91,7 +83,6 @@ fn jsts_cross_file_creates_uses_edges() {
         .filter(|e| e.relation == "uses")
         .collect();
 
-    // AppController should use both parseDate and formatDate
     assert_eq!(
         uses_edges.len(),
         2,
@@ -109,17 +100,12 @@ fn jsts_cross_file_creates_uses_edges() {
             .any(|e| e.source == "app_ctrl" && e.target == "format_date")
     );
 
-    // All uses edges should be Inferred with weight 0.8
     for edge in &uses_edges {
         assert_eq!(edge.confidence, Confidence::Inferred);
         assert!((edge.weight - 0.8).abs() < f64::EPSILON);
         assert!((edge.confidence_score - 0.8).abs() < f64::EPSILON);
     }
 }
-
-// -----------------------------------------------------------------------
-// Go cross-file resolution
-// -----------------------------------------------------------------------
 
 #[test]
 fn go_cross_file_creates_uses_edges() {
@@ -181,7 +167,6 @@ fn go_cross_file_creates_uses_edges() {
         .filter(|e| e.relation == "uses")
         .collect();
 
-    // Server should use both ParseConfig and Validate
     assert_eq!(
         uses_edges.len(),
         2,
@@ -203,10 +188,6 @@ fn go_cross_file_creates_uses_edges() {
         assert_eq!(edge.confidence, Confidence::Inferred);
     }
 }
-
-// -----------------------------------------------------------------------
-// Rust cross-file resolution
-// -----------------------------------------------------------------------
 
 #[test]
 fn rust_cross_file_creates_uses_edges() {
@@ -243,7 +224,6 @@ fn rust_cross_file_creates_uses_edges() {
         .filter(|e| e.relation == "uses")
         .collect();
 
-    // App should use both Config and Database
     assert_eq!(
         uses_edges.len(),
         2,
@@ -301,7 +281,6 @@ fn rust_cross_file_resolves_specific_type() {
         .filter(|e| e.relation == "uses")
         .collect();
 
-    // Should only create edge to Config, not Database
     assert_eq!(
         uses_edges.len(),
         1,
@@ -314,7 +293,6 @@ fn rust_cross_file_resolves_specific_type() {
 
 #[test]
 fn cross_file_no_duplicate_edges() {
-    // Two imports from the same module shouldn't create duplicate uses edges
     let mut result = ExtractionResult {
         nodes: vec![
             make_test_node("file_app", "app", "src/app.ts", NodeType::File),
@@ -341,7 +319,6 @@ fn cross_file_no_duplicate_edges() {
         .filter(|e| e.relation == "uses")
         .collect();
 
-    // Only one edge Controller → Helper even though there are two imports from utils
     assert_eq!(
         uses_edges.len(),
         1,
@@ -352,7 +329,6 @@ fn cross_file_no_duplicate_edges() {
 
 #[test]
 fn cross_file_unresolved_import_creates_no_edges() {
-    // Import from external module (not in our files) should create no uses edges
     let mut result = ExtractionResult {
         nodes: vec![
             make_test_node("file_main", "main", "src/main.rs", NodeType::File),
@@ -387,7 +363,6 @@ fn cross_file_unresolved_import_creates_no_edges() {
 
 #[test]
 fn python_resolver_not_broken_by_cross_file() {
-    // Ensure the Python resolver still works independently
     let mut result = ExtractionResult {
         nodes: vec![
             make_test_node("file_a", "module_a", "src/a.py", NodeType::File),
@@ -399,11 +374,8 @@ fn python_resolver_not_broken_by_cross_file() {
 
     resolve_python_imports(&mut result);
 
-    // The import edge target should resolve to the node ID "my_class"
     assert_eq!(result.edges[0].target, "my_class");
 }
-
-// ===== Java cross-file resolution =====
 
 #[test]
 fn java_cross_file_creates_uses_edges() {
@@ -446,8 +418,6 @@ fn java_cross_file_creates_uses_edges() {
     );
 }
 
-// ===== C/C++ cross-file resolution =====
-
 #[test]
 fn c_include_creates_uses_edges() {
     let mut result = ExtractionResult {
@@ -480,8 +450,6 @@ fn c_include_creates_uses_edges() {
             .any(|e| e.source == "main_fn" && e.target == "helper_fn")
     );
 }
-
-// ===== C# cross-file resolution =====
 
 #[test]
 fn csharp_using_creates_uses_edges() {
@@ -531,8 +499,6 @@ fn csharp_using_creates_uses_edges() {
     );
 }
 
-// ===== PHP cross-file resolution =====
-
 #[test]
 fn php_use_creates_uses_edges() {
     let mut result = ExtractionResult {
@@ -581,8 +547,6 @@ fn php_use_creates_uses_edges() {
     );
 }
 
-// ===== Dart cross-file resolution =====
-
 #[test]
 fn dart_import_creates_uses_edges() {
     let mut result = ExtractionResult {
@@ -623,8 +587,6 @@ fn dart_import_creates_uses_edges() {
             .any(|e| e.source == "main_fn" && e.target == "helper_fn")
     );
 }
-
-// ===== Kotlin cross-file resolution =====
 
 #[test]
 fn kotlin_import_creates_uses_edges() {
@@ -667,8 +629,6 @@ fn kotlin_import_creates_uses_edges() {
     );
 }
 
-// ===== Python star import expansion =====
-
 #[test]
 fn python_star_import_expands_to_entities() {
     let mut result = ExtractionResult {
@@ -703,8 +663,6 @@ fn python_star_import_expands_to_entities() {
         uses_edges.len()
     );
 }
-
-// ===== Scala cross-file resolution =====
 
 #[test]
 fn scala_cross_file_creates_uses_edges() {
@@ -757,8 +715,6 @@ fn scala_cross_file_creates_uses_edges() {
     );
 }
 
-// ===== Swift cross-file resolution =====
-
 #[test]
 fn swift_cross_file_creates_uses_edges() {
     let mut result = ExtractionResult {
@@ -809,8 +765,6 @@ fn swift_cross_file_creates_uses_edges() {
             .any(|e| e.source == "app_fn" && e.target == "mgr_class")
     );
 }
-
-// ===== Resolver unit tests =====
 
 #[test]
 fn jsts_resolver_strips_alias() {

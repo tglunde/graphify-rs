@@ -11,10 +11,6 @@ use crate::constants::{
     PAPER_PEEK_CHARS, PAPER_SIGNAL_THRESHOLD, PAPER_SIGNALS,
 };
 
-// ---------------------------------------------------------------------------
-// FileType
-// ---------------------------------------------------------------------------
-
 /// The broad category a file belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -40,20 +36,12 @@ impl std::fmt::Display for FileType {
     }
 }
 
-// ---------------------------------------------------------------------------
-// DetectedFile
-// ---------------------------------------------------------------------------
-
 /// A discovered file together with its classification.
 #[derive(Debug, Clone)]
 pub struct DetectedFile {
     pub path: std::path::PathBuf,
     pub file_type: FileType,
 }
-
-// ---------------------------------------------------------------------------
-// classify_file
-// ---------------------------------------------------------------------------
 
 /// Classify a file by its extension (and, for ambiguous cases, a peek at its
 /// content).  Returns `None` if the file type is not recognised.
@@ -65,7 +53,6 @@ pub fn classify_file(path: &Path) -> Option<FileType> {
     }
 
     if PAPER_EXTENSIONS.contains(&ext.as_str()) {
-        // PDFs inside Xcode asset catalogs are treated as images, skip them.
         if is_inside_xcode_asset(path) {
             return None;
         }
@@ -73,7 +60,6 @@ pub fn classify_file(path: &Path) -> Option<FileType> {
     }
 
     if DOC_EXTENSIONS.contains(&ext.as_str()) {
-        // Text files that look like academic papers get classified as Paper.
         if looks_like_paper(path) {
             return Some(FileType::Paper);
         }
@@ -81,7 +67,6 @@ pub fn classify_file(path: &Path) -> Option<FileType> {
     }
 
     if IMAGE_EXTENSIONS.contains(&ext.as_str()) {
-        // Images inside Xcode asset catalogs are skipped.
         if is_inside_xcode_asset(path) {
             return None;
         }
@@ -94,10 +79,6 @@ pub fn classify_file(path: &Path) -> Option<FileType> {
 
     None
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /// Return the lowercase extension including the leading dot, e.g. `".rs"`.
 fn extension_lower(path: &Path) -> Option<String> {
@@ -121,7 +102,6 @@ fn is_inside_xcode_asset(path: &Path) -> bool {
 /// Heuristic: read the first N chars and count regex hits from [`PAPER_SIGNALS`].
 /// Returns `true` when the hit count reaches [`PAPER_SIGNAL_THRESHOLD`].
 fn looks_like_paper(path: &Path) -> bool {
-    // Read only the first PAPER_PEEK_CHARS bytes instead of the entire file.
     use std::io::Read;
     let mut file = match fs::File::open(path) {
         Ok(f) => f,
@@ -134,7 +114,6 @@ fn looks_like_paper(path: &Path) -> bool {
     };
     buf.truncate(n);
 
-    // Find a valid UTF-8 boundary
     let mut end = n;
     while end > 0 && std::str::from_utf8(&buf[..end]).is_err() {
         end -= 1;
@@ -154,10 +133,6 @@ fn looks_like_paper(path: &Path) -> bool {
     }
     false
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -181,7 +156,6 @@ mod tests {
 
     #[test]
     fn classify_doc_extensions() {
-        // Non-existent files: looks_like_paper returns false -> Document
         for ext in &[".md", ".txt", ".rst"] {
             let p = PathBuf::from(format!("README{ext}"));
             assert_eq!(

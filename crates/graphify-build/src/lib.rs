@@ -18,15 +18,12 @@ use graphify_core::model::ExtractionResult;
 pub fn build_from_extraction(extraction: &ExtractionResult) -> Result<KnowledgeGraph> {
     let mut graph = KnowledgeGraph::new();
 
-    // Add all nodes
     for node in &extraction.nodes {
         let _ = graph.add_node(node.clone());
     }
 
-    // Collect known node IDs for dangling-edge check
     let node_ids: HashSet<&str> = extraction.nodes.iter().map(|n| n.id.as_str()).collect();
 
-    // Add edges, skipping those that reference unknown nodes
     let mut skipped = 0usize;
     for edge in &extraction.edges {
         if node_ids.contains(edge.source.as_str()) && node_ids.contains(edge.target.as_str()) {
@@ -39,7 +36,6 @@ pub fn build_from_extraction(extraction: &ExtractionResult) -> Result<KnowledgeG
         debug!("skipped {skipped} dangling edge(s)");
     }
 
-    // Store hyperedges
     graph.set_hyperedges(extraction.hyperedges.clone());
 
     Ok(graph)
@@ -58,10 +54,6 @@ pub fn build(extractions: &[ExtractionResult]) -> Result<KnowledgeGraph> {
     }
     build_from_extraction(&combined)
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -160,7 +152,6 @@ mod tests {
             hyperedges: vec![],
         };
         let graph = build_from_extraction(&ext).unwrap();
-        // second "a" silently skipped
         assert_eq!(graph.node_count(), 1);
     }
 

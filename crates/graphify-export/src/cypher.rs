@@ -13,11 +13,8 @@ use tracing::info;
 pub fn export_cypher(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Result<PathBuf> {
     let mut cypher = String::with_capacity(4096);
 
-    // Build unique variable names to avoid collisions when different IDs
-    // sanitize to the same name (e.g., "foo.bar" and "foo_bar" → both "foo_bar")
     let var_names = build_unique_var_names(graph);
 
-    // Nodes
     for node in graph.nodes() {
         let var = var_names.get(&node.id).map(|s| s.as_str()).unwrap_or("n");
         let node_type_label = format!("{}", node.node_type);
@@ -41,7 +38,6 @@ pub fn export_cypher(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resul
 
     writeln!(cypher)?;
 
-    // Edges
     for edge in graph.edges() {
         let rel_type = edge
             .relation
@@ -86,7 +82,6 @@ fn sanitize_var(id: &str) -> String {
             out.push('_');
         }
     }
-    // Ensure it doesn't start with a digit
     if out.starts_with(|c: char| c.is_ascii_digit()) {
         out.insert(0, '_');
     }
@@ -209,7 +204,6 @@ mod tests {
         let path = export_cypher(&kg, dir.path()).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
 
-        // Both IDs sanitize to "foo_bar", so they should get suffixed: foo_bar_0, foo_bar_1
         assert!(content.contains("foo_bar_0"));
         assert!(content.contains("foo_bar_1"));
         assert!(!content.contains("foo_bar}"));

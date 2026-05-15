@@ -90,14 +90,12 @@ pub fn save_cached_to<T: Serialize>(
     let key = cache_key(path, root);
     let cache_path = cache_dir.join(&key);
 
-    // Ensure the cache directory exists.
     if let Some(parent) = cache_path.parent()
         && fs::create_dir_all(parent).is_err()
     {
         return false;
     }
 
-    // Atomic write: serialise → write to .tmp → rename into place.
     let tmp = cache_path.with_extension("tmp");
     match serde_json::to_string(result) {
         Ok(json) => {
@@ -176,7 +174,6 @@ mod tests {
         let h2 = file_hash(&file).unwrap();
         assert_eq!(h1, h2, "hash must be deterministic");
 
-        // SHA256 of "hello world" is well-known.
         assert_eq!(
             h1,
             "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
@@ -230,7 +227,6 @@ mod tests {
         let value = make_dummy();
         assert!(save_cached_to(&src, &value, root, &cache_dir));
 
-        // Mutate the source file — hash changes, old cache entry is stale.
         fs::write(&src, "version 2").unwrap();
 
         let loaded: Option<DummyResult> = load_cached_from(&src, root, &cache_dir);

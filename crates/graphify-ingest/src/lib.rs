@@ -49,25 +49,21 @@ pub async fn ingest_url(url: &str, output_dir: &Path) -> Result<PathBuf, IngestE
 
 /// Ingest an arXiv page: fetch the abstract page and extract metadata.
 async fn ingest_arxiv(client: &Client, url: &str, out: &Path) -> Result<PathBuf, IngestError> {
-    // Normalize: convert /pdf/ URLs to /abs/ for the abstract page
     let abs_url = url.replace("/pdf/", "/abs/");
 
     let response = client.get(&abs_url).send().await?;
     let html = response.text().await?;
 
-    // Extract arXiv ID from URL
     let arxiv_id = abs_url
         .split('/')
         .next_back()
         .unwrap_or("unknown")
         .trim_end_matches(".pdf");
 
-    // Extract title
     let title = extract_between(&html, "<title>", "</title>")
         .unwrap_or_else(|| format!("arXiv:{arxiv_id}"));
     let title = strip_html_tags(&title).trim().to_string();
 
-    // Extract abstract
     let abstract_text = extract_between(
         &html,
         "<blockquote class=\"abstract mathjax\">",
@@ -117,7 +113,6 @@ async fn ingest_tweet(client: &Client, url: &str, out: &Path) -> Result<PathBuf,
         ("unknown".to_string(), format!("Tweet from: {url}"))
     };
 
-    // Extract tweet ID from URL
     let tweet_id = url
         .split('/')
         .next_back()
@@ -173,12 +168,10 @@ async fn ingest_webpage(client: &Client, url: &str, out: &Path) -> Result<PathBu
     let response = client.get(url).send().await?;
     let html = response.text().await?;
 
-    // Extract title
     let title = extract_between(&html, "<title>", "</title>")
         .map(|t| strip_html_tags(&t))
         .unwrap_or_default();
 
-    // Strip script and style tags first, then all HTML
     let text = strip_scripts_and_styles(&html);
     let text = strip_html_tags(&text);
     let text = collapse_whitespace(&text);
@@ -232,10 +225,6 @@ pub fn save_query_result(
     Ok(path)
 }
 
-// ---------------------------------------------------------------------------
-// HTML helpers
-// ---------------------------------------------------------------------------
-
 /// Extract text between two delimiters in a string.
 fn extract_between(haystack: &str, start: &str, end: &str) -> Option<String> {
     let start_idx = haystack.find(start)? + start.len();
@@ -283,10 +272,6 @@ fn sanitize_filename(input: &str) -> String {
         .take(80)
         .collect()
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

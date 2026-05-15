@@ -18,7 +18,6 @@ pub(crate) fn extract_java(path: &Path, source: &str) -> ExtractionResult {
     let lines: Vec<&str> = source.lines().collect();
     let ps = path_str(path);
 
-    // Classes / interfaces / enums
     for cap in RE_JAVA_CLASS.captures_iter(source) {
         let kind = &cap[1];
         let name = &cap[2];
@@ -40,12 +39,10 @@ pub(crate) fn extract_java(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Methods: `public void foo(` / `private static int bar(`
     let mut functions: Vec<(String, String, usize, usize)> = Vec::new();
     let func_matches: Vec<_> = RE_JAVA_METHOD.captures_iter(source).collect();
     for (i, cap) in func_matches.iter().enumerate() {
         let name = cap[1].to_string();
-        // Skip common false positives
         if [
             "if", "for", "while", "switch", "catch", "return", "new", "throw",
         ]
@@ -69,7 +66,6 @@ pub(crate) fn extract_java(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Imports
     for cap in RE_JAVA_IMPORT.captures_iter(source) {
         let module = &cap[1];
         let line = line_of(source, &cap);
@@ -97,6 +93,3 @@ pub(crate) fn extract_java(path: &Path, source: &str) -> ExtractionResult {
 
     result
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// C / C++

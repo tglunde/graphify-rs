@@ -246,12 +246,10 @@ macro_rules! verbose_print {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Check skill version staleness on every invocation
     install::check_skill_versions();
 
     let verb = Verbosity::from_flags(cli.quiet, cli.verbose);
 
-    // Configure tracing based on verbosity
     let filter = if cli.verbose {
         "debug"
     } else if cli.quiet {
@@ -263,7 +261,6 @@ async fn main() -> Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::new(filter))
         .init();
 
-    // Configure rayon thread pool if --jobs is set
     if let Some(jobs) = cli.jobs {
         rayon::ThreadPoolBuilder::new()
             .num_threads(jobs)
@@ -281,7 +278,6 @@ async fn main() -> Result<()> {
             format,
             max_viz_nodes,
         } => {
-            // Merge config file defaults with CLI args
             let app_cfg = config::load_config(Path::new(&path));
             let effective_path = path;
             let effective_output = if output == "graphify-out" {
@@ -604,7 +600,6 @@ fn cmd_stats(graph_path: &str) -> Result<()> {
     let node_count = graph.node_count();
     let edge_count = graph.edge_count();
 
-    // Count node types
     let mut type_counts: HashMap<String, usize> = HashMap::new();
     for id in graph.node_ids() {
         if let Some(node) = graph.get_node(&id) {
@@ -613,19 +608,15 @@ fn cmd_stats(graph_path: &str) -> Result<()> {
         }
     }
 
-    // Count edge relations
     let mut rel_counts: HashMap<String, usize> = HashMap::new();
     for edge in graph.edges() {
         *rel_counts.entry(edge.relation.clone()).or_insert(0) += 1;
     }
 
-    // Communities
     let communities = graphify_cluster::cluster(&graph);
 
-    // God nodes
     let god_list = graphify_analyze::god_nodes(&graph, 5);
 
-    // Degree stats
     let degrees: Vec<usize> = graph.node_ids().iter().map(|id| graph.degree(id)).collect();
     let avg_degree = if degrees.is_empty() {
         0.0

@@ -182,8 +182,6 @@ pub(crate) fn handle_rust_impl(
     }
 }
 
-// Function handler
-
 pub(crate) fn normalize_dart_function_name(lang: &str, func_name: &str) -> String {
     if lang != "dart" {
         return func_name.to_string();
@@ -288,5 +286,3 @@ pub(crate) fn handle_function(
             .push((func_nid, node.start_byte(), node.end_byte()));
     }
 }
-
-// Import handler (see imports.rs)

@@ -50,13 +50,11 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
     let suggested_questions = *suggested_questions;
     let mut report = String::with_capacity(8192);
 
-    // Header
     writeln!(report, "# 📊 Graph Analysis Report")?;
     writeln!(report)?;
     writeln!(report, "**Root:** `{root}`")?;
     writeln!(report)?;
 
-    // Summary
     writeln!(report, "## Summary")?;
     writeln!(report)?;
 
@@ -72,7 +70,6 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
     writeln!(report, "| Hyperedges | {} |", graph.hyperedges.len())?;
     writeln!(report)?;
 
-    // Confidence breakdown
     let mut extracted = 0usize;
     let mut inferred = 0usize;
     let mut ambiguous = 0usize;
@@ -108,7 +105,6 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
     )?;
     writeln!(report)?;
 
-    // God Nodes
     writeln!(report, "## 🌟 God Nodes (Most Connected)")?;
     writeln!(report)?;
     if god_nodes.is_empty() {
@@ -123,7 +119,6 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
     }
     writeln!(report)?;
 
-    // Surprising Connections
     writeln!(report, "## 🔮 Surprising Connections")?;
     writeln!(report)?;
     if surprises.is_empty() {
@@ -139,7 +134,6 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
     }
     writeln!(report)?;
 
-    // Hyperedges
     if !graph.hyperedges.is_empty() {
         writeln!(report, "## 🔗 Hyperedges")?;
         writeln!(report)?;
@@ -155,7 +149,6 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
         writeln!(report)?;
     }
 
-    // Communities
     writeln!(report, "## 🏘️ Communities")?;
     writeln!(report)?;
     let mut sorted_communities: Vec<_> = communities.iter().collect();
@@ -186,7 +179,6 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
         writeln!(report)?;
     }
 
-    // Ambiguous Edges
     if ambiguous > 0 {
         writeln!(report, "## ⚠️ Ambiguous Edges")?;
         writeln!(report)?;
@@ -208,11 +200,9 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
         writeln!(report)?;
     }
 
-    // Knowledge Gaps
     writeln!(report, "## 🕳️ Knowledge Gaps")?;
     writeln!(report)?;
 
-    // Isolated nodes (degree 0)
     let isolated: Vec<_> = graph
         .nodes()
         .iter()
@@ -232,7 +222,6 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
     }
     writeln!(report)?;
 
-    // Thin communities (< 3 nodes)
     let thin: Vec<_> = communities
         .iter()
         .filter(|(_, members)| members.len() < 3)
@@ -246,13 +235,11 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
         writeln!(report)?;
     }
 
-    // Detection result info
     if let Some(method) = detection_result.get("method").and_then(|v| v.as_str()) {
         writeln!(report, "**Community detection method:** {method}")?;
         writeln!(report)?;
     }
 
-    // Token cost
     if !token_cost.is_empty() {
         writeln!(report, "## 💰 Token Cost")?;
         writeln!(report)?;
@@ -267,7 +254,6 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
         writeln!(report)?;
     }
 
-    // Suggested Questions
     if let Some(questions) = suggested_questions
         && !questions.is_empty()
     {

@@ -8,7 +8,6 @@
 ///     return cleaned.strip("_").lower()
 /// ```
 pub fn make_id(parts: &[&str]) -> String {
-    // Filter out empty strings, strip leading/trailing '_' and '.' from each part
     let combined = parts
         .iter()
         .filter(|p| !p.is_empty())
@@ -16,9 +15,6 @@ pub fn make_id(parts: &[&str]) -> String {
         .collect::<Vec<_>>()
         .join("_");
 
-    // Replace runs of non-alphanumeric chars with a single '_'
-    // Use is_alphanumeric (not is_ascii_alphanumeric) so CJK identifiers
-    // like "类名" or "関数" are preserved instead of being stripped.
     let mut cleaned = String::with_capacity(combined.len());
     let mut prev_was_sep = false;
     for ch in combined.chars() {
@@ -31,7 +27,6 @@ pub fn make_id(parts: &[&str]) -> String {
         }
     }
 
-    // Strip leading/trailing '_' and lowercase
     cleaned.trim_matches('_').to_lowercase()
 }
 
@@ -86,7 +81,6 @@ mod tests {
 
     #[test]
     fn python_compat_complex() {
-        // Python: _make_id("__init__", "MyClass") -> "init_myclass"
         assert_eq!(make_id(&["__init__", "MyClass"]), "init_myclass");
     }
 

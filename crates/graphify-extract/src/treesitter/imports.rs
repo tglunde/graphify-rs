@@ -142,9 +142,7 @@ pub(crate) fn extract_python_import(
             .child_by_field_name("module_name")
             .map(|n| node_text(n, source))
             .unwrap_or_default();
-        // Track how many edges existed before this statement
         let edges_before = edges.len();
-        // Iterate over named import children
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             if child.kind() == "dotted_name" || child.kind() == "aliased_import" {
@@ -174,7 +172,6 @@ pub(crate) fn extract_python_import(
                 }
             }
         }
-        // If no names were added by this statement (e.g. `from x import *`), add the module
         let new_edges = edges.len() - edges_before;
         if new_edges == 0 && !module.is_empty() {
             add_import_node(
@@ -223,8 +220,6 @@ pub(crate) fn extract_js_import(
     edges: &mut Vec<GraphEdge>,
     nodes: &mut Vec<GraphNode>,
 ) {
-    // JS import: `import { X, Y } from 'module'` or `import X from 'module'`
-    // The source/module is in the `source` field
     let module = node
         .child_by_field_name("source")
         .map(|n| {
@@ -233,7 +228,6 @@ pub(crate) fn extract_js_import(
         })
         .unwrap_or_default();
 
-    // Collect imported identifiers
     let mut found_names = false;
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
@@ -305,7 +299,6 @@ pub(crate) fn extract_go_import(
     edges: &mut Vec<GraphEdge>,
     nodes: &mut Vec<GraphNode>,
 ) {
-    // Go imports: `import "fmt"` or `import ( "fmt" \n "os" )`
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         match child.kind() {
@@ -345,7 +338,6 @@ pub(crate) fn extract_go_import(
                 }
             }
             "interpreted_string_literal" => {
-                // Single import: `import "fmt"`
                 let module = node_text(child, source).trim_matches('"').to_string();
                 add_import_node(
                     nodes,
@@ -371,9 +363,6 @@ pub(crate) fn extract_ruby_import(
     edges: &mut Vec<GraphEdge>,
     nodes: &mut Vec<GraphNode>,
 ) {
-    // Ruby imports are method calls: `require 'json'`, `require_relative 'helper'`
-    // The tree-sitter node is a `call` with method=identifier("require"/"require_relative")
-    // and arguments containing a string.
     let method_name = node
         .child_by_field_name("method")
         .map(|n| node_text(n, source))
@@ -383,7 +372,6 @@ pub(crate) fn extract_ruby_import(
         return; // Not an import call, skip
     }
 
-    // Extract the argument string
     if let Some(args) = node.child_by_field_name("arguments") {
         let mut cursor = args.walk();
         for child in args.children(&mut cursor) {
@@ -407,7 +395,6 @@ pub(crate) fn extract_ruby_import(
         }
     }
 
-    // Fallback: try parsing from the raw text
     let text = node_text(node, source);
     let module = text
         .trim()
@@ -437,11 +424,9 @@ pub(crate) fn extract_dart_import(
     edges: &mut Vec<GraphEdge>,
     nodes: &mut Vec<GraphNode>,
 ) {
-    // Dart: `import 'dart:async';`, `part 'src/models.dart';`
     let text = node_text(node, source);
     let trimmed = text.trim().trim_end_matches(';').trim();
 
-    // Strip keyword prefix
     let module = trimmed
         .strip_prefix("part of ")
         .or_else(|| trimmed.strip_prefix("part "))
@@ -450,7 +435,6 @@ pub(crate) fn extract_dart_import(
         .unwrap_or(trimmed)
         .trim()
         .trim_matches(&['"', '\''][..])
-        // Remove `deferred as X`, `as X`, `show X`, `hide X` suffixes
         .split(" deferred ")
         .next()
         .unwrap_or("")
@@ -477,10 +461,6 @@ pub(crate) fn extract_dart_import(
         );
     }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════════════════════════════════
 
 /// Extract text from a tree-sitter node.
 pub(crate) fn add_import_node(

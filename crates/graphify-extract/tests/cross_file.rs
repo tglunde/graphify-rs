@@ -3,9 +3,7 @@
 use graphify_extract::{extract, language_for_path};
 use std::path::Path;
 
-// ═══════════════════════════════════════════════════════════════════════════
 // Dispatch
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn language_for_path_works() {

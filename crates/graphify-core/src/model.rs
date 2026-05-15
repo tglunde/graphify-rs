@@ -4,10 +4,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::confidence::Confidence;
 
-// ---------------------------------------------------------------------------
-// NodeType
-// ---------------------------------------------------------------------------
-
 /// The kind of entity a graph node represents.
 ///
 /// Serialized as lowercase strings (e.g. `"class"`, `"function"`).
@@ -55,10 +51,6 @@ impl std::fmt::Display for NodeType {
     }
 }
 
-// ---------------------------------------------------------------------------
-// GraphNode
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GraphNode {
     pub id: String,
@@ -72,10 +64,6 @@ pub struct GraphNode {
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }
-
-// ---------------------------------------------------------------------------
-// GraphEdge
-// ---------------------------------------------------------------------------
 
 fn default_confidence_score() -> f64 {
     1.0
@@ -102,20 +90,12 @@ pub struct GraphEdge {
     pub extra: HashMap<String, serde_json::Value>,
 }
 
-// ---------------------------------------------------------------------------
-// Hyperedge
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hyperedge {
     pub nodes: Vec<String>,
     pub relation: String,
     pub label: String,
 }
-
-// ---------------------------------------------------------------------------
-// ExtractionResult
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ExtractionResult {
@@ -125,10 +105,6 @@ pub struct ExtractionResult {
     pub hyperedges: Vec<Hyperedge>,
 }
 
-// ---------------------------------------------------------------------------
-// CommunityInfo
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunityInfo {
     pub id: usize,
@@ -137,10 +113,6 @@ pub struct CommunityInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 }
-
-// ---------------------------------------------------------------------------
-// AnalysisResult & helpers
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GodNode {
@@ -218,10 +190,6 @@ pub struct SimilarPair {
     pub label_a: String,
     pub label_b: String,
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

@@ -21,7 +21,6 @@ pub fn temporal_analysis(
     repo_root: &Path,
     top_n: usize,
 ) -> Vec<TemporalNode> {
-    // Collect unique source files from nodes
     let mut file_stats: HashMap<String, (usize, String)> = HashMap::new(); // file → (commit_count, last_date)
 
     let source_files: Vec<String> = graph
@@ -42,10 +41,8 @@ pub fn temporal_analysis(
         return Vec::new();
     }
 
-    // Get current date for age calculation
     let now = chrono_days_since_epoch();
 
-    // Max degree for normalization
     let max_degree = graph
         .node_ids()
         .iter()
@@ -132,7 +129,6 @@ fn days_since_epoch_2020(date_str: &str) -> Option<u64> {
     if m == 0 || m > 12 || d == 0 {
         return None;
     }
-    // Cumulative days for months Jan..Nov (0-indexed)
     const CUM_DAYS: [u64; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
     let leap_extra = if m > 2 && (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) {
         1
@@ -155,7 +151,6 @@ fn chrono_days_since_epoch() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    // 2020-01-01 = 1577836800 epoch seconds
     secs.saturating_sub(1577836800) / 86400
 }
 

@@ -28,7 +28,6 @@ pub fn export_graphml(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resu
     )
     .unwrap();
 
-    // Key definitions for node attributes
     writeln!(
         xml,
         r#"  <key id="label" for="node" attr.name="label" attr.type="string"/>"#
@@ -50,7 +49,6 @@ pub fn export_graphml(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resu
     )
     .unwrap();
 
-    // Key definitions for edge attributes
     writeln!(
         xml,
         r#"  <key id="relation" for="edge" attr.name="relation" attr.type="string"/>"#
@@ -74,7 +72,6 @@ pub fn export_graphml(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resu
 
     writeln!(xml, r#"  <graph id="G" edgedefault="undirected">"#)?;
 
-    // Nodes
     for node in graph.nodes() {
         writeln!(xml, r#"    <node id="{}">"#, xml_escape(&node.id))?;
         writeln!(
@@ -101,7 +98,6 @@ pub fn export_graphml(graph: &KnowledgeGraph, output_dir: &Path) -> anyhow::Resu
         writeln!(xml, "    </node>")?;
     }
 
-    // Edges
     for (i, edge) in graph.edges().iter().enumerate() {
         writeln!(
             xml,

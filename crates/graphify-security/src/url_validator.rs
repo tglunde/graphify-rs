@@ -39,7 +39,6 @@ fn is_private_host(host: &str) -> bool {
         return true;
     }
 
-    // Try parsing as IP address (handles IPv4, IPv6, and various representations)
     if let Ok(ip) = host
         .trim_start_matches('[')
         .trim_end_matches(']')
@@ -48,7 +47,6 @@ fn is_private_host(host: &str) -> bool {
         return ip_is_private(&ip);
     }
 
-    // Try parsing as IPv4 with octal/hex components (e.g., 0x7f000001, 0177.0.0.1)
     if let Some(ipv4) = parse_nonstandard_ipv4(host) {
         return ip_is_private(&std::net::IpAddr::V4(ipv4));
     }
@@ -64,17 +62,21 @@ fn ip_is_private(ip: &std::net::IpAddr) -> bool {
                 || v4.is_private()
                 || v4.is_link_local()
                 || v4.is_unspecified()
-                // Carrier-Grade NAT (RFC 6598) — used by cloud metadata services
-                || is_in_range(v4, &std::net::Ipv4Addr::new(100, 64, 0, 0), &std::net::Ipv4Addr::new(100, 127, 255, 255))
-                // Benchmarking (RFC 2544)
-                || is_in_range(v4, &std::net::Ipv4Addr::new(198, 18, 0, 0), &std::net::Ipv4Addr::new(198, 19, 255, 255))
+                || is_in_range(
+                    v4,
+                    &std::net::Ipv4Addr::new(100, 64, 0, 0),
+                    &std::net::Ipv4Addr::new(100, 127, 255, 255),
+                )
+                || is_in_range(
+                    v4,
+                    &std::net::Ipv4Addr::new(198, 18, 0, 0),
+                    &std::net::Ipv4Addr::new(198, 19, 255, 255),
+                )
         }
         std::net::IpAddr::V6(v6) => {
             v6.is_loopback()
                 || v6.is_unspecified()
-                // Unique Local Addresses (fc00::/7)
                 || matches!(v6.octets()[0] & 0xfe, 0xfc)
-                // Link-Local (fe80::/10)
                 || matches!(v6.octets()[0], 0xfe) && matches!(v6.octets()[1] & 0xc0, 0x80)
         }
     }
@@ -91,11 +93,9 @@ fn is_in_range(
 
 /// Try parsing non-standard IPv4 representations (decimal, hex, octal).
 fn parse_nonstandard_ipv4(host: &str) -> Option<std::net::Ipv4Addr> {
-    // Handle decimal representation (e.g., 2130706433 = 127.0.0.1)
     if let Ok(num) = host.parse::<u32>() {
         return Some(std::net::Ipv4Addr::from(num));
     }
-    // Handle hex representation (e.g., 0x7f000001)
     if let Some(hex) = host.strip_prefix("0x").or_else(|| host.strip_prefix("0X"))
         && let Ok(num) = u32::from_str_radix(hex, 16)
     {

@@ -21,17 +21,13 @@ pub fn export_obsidian(
     let vault_dir = output_dir.join("obsidian");
     fs::create_dir_all(&vault_dir)?;
 
-    // Build unique filenames to avoid collisions when different nodes have
-    // labels that sanitize to the same name (e.g., "MyClass" and "my_class")
     let file_names = build_unique_filenames(graph);
 
-    // Pre-compute node → community mapping for frontmatter
     let node_community: HashMap<&str, usize> = communities
         .iter()
         .flat_map(|(&cid, members)| members.iter().map(move |nid| (nid.as_str(), cid)))
         .collect();
 
-    // Collect all edges grouped by source/target for fast lookup
     let all_edges = graph.edges();
     let mut edges_for: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
     for edge in &all_edges {
@@ -54,7 +50,6 @@ pub fn export_obsidian(
 
         let mut content = String::with_capacity(512);
 
-        // --- YAML frontmatter ---
         content.push_str("---\n");
         writeln!(content, "id: {}", node.id)?;
         writeln!(content, "type: {}", node.node_type)?;
@@ -69,7 +64,6 @@ pub fn export_obsidian(
         }
         content.push_str("---\n\n");
 
-        // --- Connections ---
         if let Some(neighbours) = edges_for.get(node.id.as_str())
             && !neighbours.is_empty()
         {

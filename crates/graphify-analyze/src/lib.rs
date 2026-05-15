@@ -10,10 +10,6 @@ use tracing::debug;
 use graphify_core::graph::KnowledgeGraph;
 use graphify_core::model::{BridgeNode, DependencyCycle, GodNode, PageRankNode, Surprise};
 
-// ---------------------------------------------------------------------------
-// God nodes
-// ---------------------------------------------------------------------------
-
 /// Find the most-connected nodes, excluding file-level hubs and method stubs.
 ///
 /// Returns up to `top_n` nodes sorted by degree descending.
@@ -29,8 +25,6 @@ pub fn god_nodes(graph: &KnowledgeGraph, top_n: usize) -> Vec<GodNode> {
         .map(|id| {
             let node = graph.get_node(&id).unwrap();
             let label = if generic_labels.contains(&node.label.as_str()) {
-                // Extract crate/module name from source_file path
-                // e.g. "crates/graphify-export/src/lib.rs" → "graphify-export::lib"
                 disambiguate_label(&node.label, &node.source_file)
             } else {
                 node.label.clone()
@@ -59,22 +53,16 @@ pub fn god_nodes(graph: &KnowledgeGraph, top_n: usize) -> Vec<GodNode> {
 /// - ("lib", "src/lib.rs") → "lib"
 fn disambiguate_label(label: &str, source_file: &str) -> String {
     let parts: Vec<&str> = source_file.split('/').collect();
-    // Try to find crate name: look for the segment before "src/"
     for (i, &segment) in parts.iter().enumerate() {
         if segment == "src" && i > 0 {
             return format!("{}::{}", parts[i - 1], label);
         }
     }
-    // Fallback: use parent directory
     if parts.len() >= 2 {
         return format!("{}::{}", parts[parts.len() - 2], label);
     }
     label.to_string()
 }
-
-// ---------------------------------------------------------------------------
-// Surprising connections
-// ---------------------------------------------------------------------------
 
 /// Find surprising connections that span different communities or source files.
 ///
@@ -89,7 +77,6 @@ pub fn surprising_connections(
     communities: &HashMap<usize, Vec<String>>,
     top_n: usize,
 ) -> Vec<Surprise> {
-    // Build reverse map: node_id → community_id
     let node_to_community: HashMap<&str, usize> = communities
         .iter()
         .flat_map(|(&cid, nodes)| nodes.iter().map(move |n| (n.as_str(), cid)))
@@ -98,7 +85,6 @@ pub fn surprising_connections(
     let mut surprises: Vec<(f64, Surprise)> = Vec::new();
 
     for (src, tgt, edge) in graph.edges_with_endpoints() {
-        // Skip file/stub nodes
         if is_file_node(graph, src) || is_file_node(graph, tgt) {
             continue;
         }
@@ -111,12 +97,10 @@ pub fn surprising_connections(
 
         let mut score = 0.0;
 
-        // Cross-community bonus
         if src_comm != tgt_comm {
             score += 2.0;
         }
 
-        // Cross-file bonus
         let src_node = graph.get_node(src);
         let tgt_node = graph.get_node(tgt);
         if let (Some(sn), Some(tn)) = (src_node, tgt_node)
@@ -127,7 +111,6 @@ pub fn surprising_connections(
             score += 1.0;
         }
 
-        // Confidence bonus: AMBIGUOUS > INFERRED > EXTRACTED
         use graphify_core::confidence::Confidence;
         match edge.confidence {
             Confidence::Ambiguous => score += 3.0,
@@ -155,10 +138,6 @@ pub fn surprising_connections(
     surprises.into_iter().map(|(_, s)| s).collect()
 }
 
-// ---------------------------------------------------------------------------
-// Suggest questions
-// ---------------------------------------------------------------------------
-
 /// Generate graph-aware questions based on structural patterns.
 ///
 /// Categories:
@@ -175,7 +154,6 @@ pub fn suggest_questions(
 ) -> Vec<HashMap<String, String>> {
     let mut questions: Vec<HashMap<String, String>> = Vec::new();
 
-    // 1. AMBIGUOUS edges
     {
         use graphify_core::confidence::Confidence;
         for (src, tgt, edge) in graph.edges_with_endpoints() {
@@ -238,7 +216,6 @@ pub fn suggest_questions(
         }
     }
 
-    // 3. God nodes with INFERRED edges
     {
         use graphify_core::confidence::Confidence;
         let gods = god_nodes(graph, 5);
@@ -262,7 +239,6 @@ pub fn suggest_questions(
         }
     }
 
-    // 4. Isolated nodes (degree 0)
     {
         for id in graph.node_ids() {
             if graph.degree(&id) == 0
@@ -284,7 +260,6 @@ pub fn suggest_questions(
         }
     }
 
-    // 5. Low-cohesion communities (< 0.3)
     {
         for (&cid, nodes) in communities {
             let n = nodes.len();
@@ -316,10 +291,6 @@ pub fn suggest_questions(
     questions
 }
 
-// ---------------------------------------------------------------------------
-// Graph diff
-// ---------------------------------------------------------------------------
-
 /// Compare two graph snapshots and return a summary of changes.
 pub fn graph_diff(
     old: &KnowledgeGraph,
@@ -331,7 +302,6 @@ pub fn graph_diff(
     let added_nodes: Vec<&String> = new_node_ids.difference(&old_node_ids).collect();
     let removed_nodes: Vec<&String> = old_node_ids.difference(&new_node_ids).collect();
 
-    // Edge keys: (source, target, relation)
     let old_edge_keys: HashSet<(String, String, String)> = old
         .edges_with_endpoints()
         .iter()
@@ -386,10 +356,6 @@ pub fn graph_diff(
     result
 }
 
-// ---------------------------------------------------------------------------
-// Community bridges
-// ---------------------------------------------------------------------------
-
 /// Find nodes that bridge multiple communities.
 ///
 /// A bridge node has a high ratio of cross-community edges to total edges.
@@ -399,7 +365,6 @@ pub fn community_bridges(
     communities: &HashMap<usize, Vec<String>>,
     top_n: usize,
 ) -> Vec<BridgeNode> {
-    // Build node → community mapping
     let node_to_community: HashMap<&str, usize> = communities
         .iter()
         .flat_map(|(&cid, nodes)| nodes.iter().map(move |n| (n.as_str(), cid)))
@@ -460,20 +425,14 @@ pub fn community_bridges(
     bridges
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /// Is this a file-level hub node?
 fn is_file_node(graph: &KnowledgeGraph, node_id: &str) -> bool {
-    if let Some(node) = graph.get_node(node_id) {
-        // label matches source filename
-        if !node.source_file.is_empty()
-            && let Some(fname) = std::path::Path::new(&node.source_file).file_name()
-            && node.label == fname.to_string_lossy()
-        {
-            return true;
-        }
+    if let Some(node) = graph.get_node(node_id)
+        && !node.source_file.is_empty()
+        && let Some(fname) = std::path::Path::new(&node.source_file).file_name()
+        && node.label == fname.to_string_lossy()
+    {
+        return true;
     }
     false
 }
@@ -481,11 +440,9 @@ fn is_file_node(graph: &KnowledgeGraph, node_id: &str) -> bool {
 /// Is this a method stub (.method_name() or isolated fn()?
 fn is_method_stub(graph: &KnowledgeGraph, node_id: &str) -> bool {
     if let Some(node) = graph.get_node(node_id) {
-        // Method stub: ".method_name()"
         if node.label.starts_with('.') && node.label.ends_with("()") {
             return true;
         }
-        // Isolated function stub
         if node.label.ends_with("()") && graph.degree(node_id) <= 1 {
             return true;
         }
@@ -519,10 +476,6 @@ fn compute_cohesion(graph: &KnowledgeGraph, community_nodes: &[String]) -> f64 {
     actual_edges as f64 / possible as f64
 }
 
-// ---------------------------------------------------------------------------
-// PageRank
-// ---------------------------------------------------------------------------
-
 /// Compute PageRank importance scores for all nodes.
 ///
 /// Returns the top `top_n` nodes sorted by PageRank score descending.
@@ -545,7 +498,6 @@ pub fn pagerank(
         .map(|(i, s)| (s.as_str(), i))
         .collect();
 
-    // Build adjacency + out-degree (undirected graph: treat all edges as bidirectional)
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
     for (src, tgt, _) in graph.edges_with_endpoints() {
         if let (Some(&si), Some(&ti)) = (id_to_idx.get(src), id_to_idx.get(tgt)) {
@@ -562,7 +514,6 @@ pub fn pagerank(
     for _ in 0..max_iterations {
         let teleport = (1.0 - damping) / n as f64;
 
-        // Dangling node mass (nodes with no outgoing edges)
         let dangling_sum: f64 = rank
             .iter()
             .enumerate()
@@ -580,7 +531,6 @@ pub fn pagerank(
             next_rank[v] = teleport + damping * (sum + dangling_sum / n as f64);
         }
 
-        // Check convergence
         let delta: f64 = rank
             .iter()
             .zip(next_rank.iter())
@@ -592,7 +542,6 @@ pub fn pagerank(
         }
     }
 
-    // Build result
     let mut results: Vec<PageRankNode> = ids
         .iter()
         .enumerate()
@@ -616,10 +565,6 @@ pub fn pagerank(
     results
 }
 
-// ---------------------------------------------------------------------------
-// Dependency cycle detection
-// ---------------------------------------------------------------------------
-
 /// Detect dependency cycles using Tarjan's algorithm for strongly connected components.
 ///
 /// Only considers directional edges (imports, uses, calls) to find true dependency cycles.
@@ -635,7 +580,6 @@ pub fn detect_cycles(graph: &KnowledgeGraph, max_cycles: usize) -> Vec<Dependenc
         .collect();
     let n = ids.len();
 
-    // Build directed adjacency list
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
     for (src, tgt, edge) in graph.edges_with_endpoints() {
         if directional.contains(&edge.relation.as_str())
@@ -645,17 +589,14 @@ pub fn detect_cycles(graph: &KnowledgeGraph, max_cycles: usize) -> Vec<Dependenc
         }
     }
 
-    // Tarjan's SCC
     let sccs = tarjan_scc(&adj, n);
 
-    // For each SCC with size > 1, extract cycle
     let mut cycles: Vec<DependencyCycle> = Vec::new();
     for scc in &sccs {
         if scc.len() <= 1 || cycles.len() >= max_cycles {
             continue;
         }
 
-        // Find a simple cycle within this SCC using DFS
         let scc_set: HashSet<usize> = scc.iter().copied().collect();
         if let Some(cycle_indices) = find_cycle_in_scc(&adj, scc, &scc_set) {
             let nodes: Vec<String> = cycle_indices.iter().map(|&i| ids[i].clone()).collect();
@@ -699,7 +640,6 @@ fn tarjan_scc(adj: &[Vec<usize>], n: usize) -> Vec<Vec<usize>> {
             continue;
         }
 
-        // Explicit call stack: (node, neighbor_index)
         let mut call_stack: Vec<(usize, usize)> = Vec::new();
 
         index[start] = index_counter;
@@ -726,7 +666,6 @@ fn tarjan_scc(adj: &[Vec<usize>], n: usize) -> Vec<Vec<usize>> {
                     lowlink[v] = lowlink[v].min(index[w]);
                 }
             } else {
-                // All neighbors processed
                 if lowlink[v] == index[v] {
                     let mut component = Vec::new();
                     while let Some(w) = stack.pop() {
@@ -739,7 +678,6 @@ fn tarjan_scc(adj: &[Vec<usize>], n: usize) -> Vec<Vec<usize>> {
                     result.push(component);
                 }
 
-                // Propagate lowlink to parent
                 if let Some(&(parent, _)) = call_stack.last() {
                     lowlink[parent] = lowlink[parent].min(lowlink[v]);
                 }
@@ -763,7 +701,6 @@ fn find_cycle_in_scc(
     let mut visited = HashSet::new();
     let mut path = Vec::new();
 
-    // Stack: (node, neighbor_index)
     let mut dfs_stack: Vec<(usize, usize)> = vec![(start, 0)];
     path.push(start);
     visited.insert(start);
@@ -795,10 +732,6 @@ fn find_cycle_in_scc(
 
 pub mod embedding;
 pub mod temporal;
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests;

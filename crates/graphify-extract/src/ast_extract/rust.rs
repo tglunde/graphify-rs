@@ -18,7 +18,6 @@ pub(crate) fn extract_rust(path: &Path, source: &str) -> ExtractionResult {
     let lines: Vec<&str> = source.lines().collect();
     let ps = path_str(path);
 
-    // Structs: `pub struct Foo` / `struct Foo`
     for cap in RE_RS_STRUCT.captures_iter(source) {
         let name = &cap[1];
         let line = line_of(source, &cap);
@@ -34,7 +33,6 @@ pub(crate) fn extract_rust(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Enums: `pub enum Foo` / `enum Foo`
     for cap in RE_RS_ENUM.captures_iter(source) {
         let name = &cap[1];
         let line = line_of(source, &cap);
@@ -50,7 +48,6 @@ pub(crate) fn extract_rust(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Traits: `pub trait Foo` / `trait Foo`
     for cap in RE_RS_TRAIT.captures_iter(source) {
         let name = &cap[1];
         let line = line_of(source, &cap);
@@ -66,12 +63,10 @@ pub(crate) fn extract_rust(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Impl blocks: `impl Foo` / `impl Trait for Foo`
     for cap in RE_RS_IMPL.captures_iter(source) {
         let _trait_name = cap.get(1).map(|m| m.as_str());
         let type_name = &cap[2];
         let line = line_of(source, &cap);
-        // Create an "implements" edge if impl Trait for Type
         if let Some(trait_m) = cap.get(1) {
             let trait_id = make_id(&[&ps, trait_m.as_str()]);
             let type_id = make_id(&[&ps, type_name]);
@@ -86,8 +81,6 @@ pub(crate) fn extract_rust(path: &Path, source: &str) -> ExtractionResult {
         let _ = line;
     }
 
-    // Functions: `pub fn foo(` / `fn foo(` / `pub(crate) fn foo(`
-    // Also methods inside impl blocks
     let mut functions: Vec<(String, String, usize, usize)> = Vec::new();
     let func_matches: Vec<_> = RE_RS_FUNC.captures_iter(source).collect();
     for (i, cap) in func_matches.iter().enumerate() {
@@ -114,7 +107,6 @@ pub(crate) fn extract_rust(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Use statements
     for cap in RE_RS_USE.captures_iter(source) {
         let module = &cap[1];
         let line = line_of(source, &cap);
@@ -142,6 +134,3 @@ pub(crate) fn extract_rust(path: &Path, source: &str) -> ExtractionResult {
 
     result
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Go

@@ -18,7 +18,6 @@ pub(crate) fn extract_ruby(path: &Path, source: &str) -> ExtractionResult {
     let lines: Vec<&str> = source.lines().collect();
     let ps = path_str(path);
 
-    // Classes and modules
     for cap in RE_RB_CLASS.captures_iter(source) {
         let name = &cap[2];
         let line = line_of(source, &cap);
@@ -34,7 +33,6 @@ pub(crate) fn extract_ruby(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Methods
     let mut functions: Vec<(String, String, usize, usize)> = Vec::new();
     let func_matches: Vec<_> = RE_RB_FUNC.captures_iter(source).collect();
     for (i, cap) in func_matches.iter().enumerate() {
@@ -55,7 +53,6 @@ pub(crate) fn extract_ruby(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // require / require_relative
     for cap in RE_RB_REQUIRE.captures_iter(source) {
         let module = &cap[1];
         let line = line_of(source, &cap);
@@ -83,6 +80,3 @@ pub(crate) fn extract_ruby(path: &Path, source: &str) -> ExtractionResult {
 
     result
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// C#

@@ -80,7 +80,6 @@ pub fn is_sensitive(path: &Path) -> bool {
         None => return false,
     };
 
-    // Extension check
     if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
         let dot_ext = format!(".{}", ext.to_ascii_lowercase());
         if SENSITIVE_EXTENSIONS.contains(&dot_ext.as_str()) {
@@ -88,14 +87,12 @@ pub fn is_sensitive(path: &Path) -> bool {
         }
     }
 
-    // Exact filename match
     for name in SENSITIVE_FILENAMES {
         if filename == *name {
             return true;
         }
     }
 
-    // Word-boundary match against filename stem
     let stem = path
         .file_stem()
         .and_then(|s| s.to_str())
@@ -107,7 +104,6 @@ pub fn is_sensitive(path: &Path) -> bool {
         }
     }
 
-    // Directory segment match against full path (catches dirs like `secrets/`)
     for component in path.ancestors().skip(1) {
         if let Some(dir_name) = component.file_name().and_then(|n| n.to_str()) {
             let dir_lower = dir_name.to_ascii_lowercase();
@@ -119,10 +115,6 @@ pub fn is_sensitive(path: &Path) -> bool {
 
     false
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -187,9 +179,7 @@ mod tests {
         // which is correct — "secret_manager" does contain the word "secret".
         // The improvement is that partial matches like "secretresolver" no longer trigger.
         assert!(is_sensitive(Path::new("src/utils/secret_resolver.rs")));
-        // But "secretresolver" (no boundary) should NOT trigger
         assert!(!is_sensitive(Path::new("src/utils/secretresolver.rs")));
-        // And "mysecret" (no boundary) should NOT trigger
         assert!(!is_sensitive(Path::new("src/utils/mysecret.rs")));
     }
 

@@ -62,15 +62,12 @@ mod tests {
 
     #[test]
     fn test_safe_path_traversal_blocked() {
-        // Try to escape from a subdirectory to its parent
         let dir = std::env::temp_dir().join("graphify_security_test_traversal");
         let sub = dir.join("sub");
         let _ = fs::create_dir_all(&sub);
-        // Create a file in the parent dir
         let file = dir.join("secret.txt");
         fs::write(&file, "secret").unwrap();
 
-        // Attempt traversal: sub/../secret.txt should be blocked when root is sub/
         let traversal = sub.join("../secret.txt");
         let result = safe_path(&traversal, &sub);
         assert!(matches!(result, Err(SecurityError::PathTraversal(_))));
@@ -107,7 +104,6 @@ mod tests {
 
     #[test]
     fn test_validate_graph_path_dot_json_in_middle() {
-        // "foo.json.bak" should fail — extension is "bak"
         let result = validate_graph_path("foo.json.bak");
         assert!(matches!(result, Err(SecurityError::InvalidPath(_))));
     }

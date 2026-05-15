@@ -18,7 +18,6 @@ pub(crate) fn extract_js_ts(path: &Path, source: &str, lang: &str) -> Extraction
     let lines: Vec<&str> = source.lines().collect();
     let ps = path_str(path);
 
-    // Classes: `class Foo` / `export class Foo`
     for cap in RE_JS_CLASS.captures_iter(source) {
         let name = &cap[1];
         let line = line_of(source, &cap);
@@ -34,8 +33,6 @@ pub(crate) fn extract_js_ts(path: &Path, source: &str, lang: &str) -> Extraction
         ));
     }
 
-    // Functions: `function foo(` / `const foo = (` / `const foo = async (`
-    // Also: `export function foo(` / `export default function foo(`
     let mut functions: Vec<(String, String, usize, usize)> = Vec::new();
     let func_matches: Vec<_> = RE_JS_FUNC.captures_iter(source).collect();
 
@@ -64,7 +61,6 @@ pub(crate) fn extract_js_ts(path: &Path, source: &str, lang: &str) -> Extraction
         ));
     }
 
-    // Imports: `import { X } from 'Y'` / `import X from 'Y'` / `import 'Y'`
     for cap in RE_JS_IMPORT.captures_iter(source) {
         let module = cap.get(3).or(cap.get(4)).map_or("", |m| m.as_str());
         let line = line_of(source, &cap);
@@ -116,7 +112,6 @@ pub(crate) fn extract_js_ts(path: &Path, source: &str, lang: &str) -> Extraction
         }
     }
 
-    // Also handle require() for JS
     if lang == "javascript" {
         for cap in RE_JS_REQUIRE.captures_iter(source) {
             let name = &cap[1];
@@ -147,6 +142,3 @@ pub(crate) fn extract_js_ts(path: &Path, source: &str, lang: &str) -> Extraction
 
     result
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Rust

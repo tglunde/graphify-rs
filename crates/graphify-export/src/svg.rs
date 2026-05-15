@@ -56,7 +56,6 @@ pub fn export_svg(
         return Ok(path);
     }
 
-    // Reverse map: node_id → community_id
     let mut node_community: HashMap<&str, usize> = HashMap::new();
     for (&cid, members) in communities {
         for nid in members {
@@ -64,7 +63,6 @@ pub fn export_svg(
         }
     }
 
-    // Assign positions in a circle
     let n = nodes.len();
     let cx = SVG_WIDTH / 2.0;
     let cy = SVG_HEIGHT / 2.0;
@@ -88,7 +86,6 @@ pub fn export_svg(
         "<rect width=\"100%\" height=\"100%\" fill=\"{BG_COLOR}\"/>"
     )?;
 
-    // Edges
     for edge in &edges {
         if let (Some(&(x1, y1)), Some(&(x2, y2))) = (
             positions.get(edge.source.as_str()),
@@ -101,7 +98,6 @@ pub fn export_svg(
         }
     }
 
-    // Nodes
     for node in &nodes {
         if let Some(&(x, y)) = positions.get(node.id.as_str()) {
             let cid = node
@@ -122,7 +118,6 @@ pub fn export_svg(
         }
     }
 
-    // Labels for small graphs
     if n <= 50 {
         for node in &nodes {
             if let Some(&(x, y)) = positions.get(node.id.as_str()) {

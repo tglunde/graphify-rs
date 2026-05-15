@@ -4,9 +4,7 @@ use graphify_core::model::NodeType;
 use graphify_extract::treesitter::try_extract;
 use std::path::Path;
 
-// ═══════════════════════════════════════════════════════════════════════════
 // Python
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn ts_python_extracts_class_and_methods() {
@@ -63,10 +61,6 @@ def bar():
     assert!(result.edges.iter().any(|e| e.relation == "calls"));
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Rust
-// ═══════════════════════════════════════════════════════════════════════════
-
 #[test]
 fn ts_rust_extracts_structs_and_functions() {
     let source = br#"
@@ -97,9 +91,7 @@ pub fn main() {
     assert!(result.edges.iter().any(|e| e.relation == "implements"));
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // JavaScript
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn ts_js_extracts_functions_and_classes() {
@@ -126,10 +118,6 @@ export function fetchData(url) { return axios.get(url); }
             >= 2
     );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Go
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn ts_go_extracts_types_and_functions() {
@@ -162,9 +150,7 @@ func main() { s := Server{host: "localhost", port: 8080}; s.Start() }
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // Unsupported & comparison
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn ts_unsupported_returns_none() {
@@ -189,10 +175,6 @@ def standalone():
     let ts_result = try_extract(Path::new("test.py"), source_str.as_bytes(), "python").unwrap();
     assert!(ts_result.nodes.len() >= regex_result.nodes.len());
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Java
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn ts_java_extracts_class_and_methods() {
@@ -222,9 +204,7 @@ public interface Runnable { void run(); }
     assert!(labels.iter().any(|l| l.contains("Runnable")));
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // C / C++ / Ruby / C# / Dart
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn ts_c_extracts_functions() {
@@ -327,9 +307,7 @@ void main() { print('hello'); }
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // Cross-cutting
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn all_edges_have_source_file() {
@@ -351,9 +329,7 @@ fn node_ids_are_deterministic() {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // Tree-sitter config completeness tests
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn ts_ruby_extracts_module_and_require() {
@@ -533,9 +509,7 @@ void main() {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // Bug fix regression tests
-// ═══════════════════════════════════════════════════════════════════════════
 
 /// Bug 1: Ruby require/require_relative should produce clean module names, not raw text
 #[test]

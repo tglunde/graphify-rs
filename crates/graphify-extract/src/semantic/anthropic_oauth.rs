@@ -29,7 +29,6 @@ fn read_token_from_file(path: &std::path::Path) -> Option<String> {
     let content = std::fs::read_to_string(path).ok()?;
     let json: serde_json::Value = serde_json::from_str(&content).ok()?;
 
-    // Check token expiry — expiresAt is a Unix timestamp in milliseconds
     if let Some(expires_at) = json.get("expiresAt").and_then(serde_json::Value::as_i64) {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -41,8 +40,6 @@ fn read_token_from_file(path: &std::path::Path) -> Option<String> {
         }
     }
 
-    // Try common field names for OAuth access tokens
-    // Note: "apiKey" is excluded — it should be used via AuthType::ApiKey, not Bearer
     for field in &["accessToken", "access_token", "oauthToken", "token"] {
         if let Some(val) = json
             .get(*field)
@@ -104,7 +101,6 @@ mod tests {
         write!(f, r#"{{"apiKey": "sk-ant-xxx"}}"#).unwrap();
 
         let token = read_token_from_file(&path);
-        // apiKey should NOT be treated as an OAuth token
         assert!(token.is_none());
     }
 
@@ -141,7 +137,6 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("credentials.json");
         let mut f = std::fs::File::create(&path).unwrap();
-        // expiresAt in the past (1 second ago in milliseconds)
         let past = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -163,7 +158,6 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("credentials.json");
         let mut f = std::fs::File::create(&path).unwrap();
-        // expiresAt 1 hour in the future
         let future = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

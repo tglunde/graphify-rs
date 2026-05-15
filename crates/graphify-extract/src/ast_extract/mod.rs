@@ -38,9 +38,6 @@ macro_rules! re {
     };
 }
 
-// Make the macro visible to submodules.
-
-// Pre-compiled regex patterns — initialized once, never panic at runtime
 re!(RE_PY_CLASS, r"(?m)^(\s*)class\s+(\w+)");
 re!(RE_PY_CLASS_LOOKUP, r"^(\s*)class\s+(\w+)");
 re!(RE_PY_FUNC, r"(?m)^(\s*)def\s+(\w+)\s*\(");
@@ -167,10 +164,6 @@ pub fn extract_file(path: &Path, source: &str, lang: &str) -> ExtractionResult {
         _ => generic::extract_generic(path, source, lang),
     }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Helpers (shared by all language extractors)
-// ═══════════════════════════════════════════════════════════════════════════
 
 pub(crate) fn file_stem(path: &Path) -> String {
     path.file_stem()

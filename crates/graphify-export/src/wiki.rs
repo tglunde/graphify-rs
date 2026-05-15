@@ -23,7 +23,6 @@ pub fn export_wiki(
     let wiki_dir = output_dir.join("wiki");
     fs::create_dir_all(&wiki_dir)?;
 
-    // --- index.md ---
     let mut index = String::with_capacity(2048);
     writeln!(index, "# Knowledge Graph Wiki")?;
     writeln!(index)?;
@@ -49,7 +48,6 @@ pub fn export_wiki(
     }
     writeln!(index)?;
 
-    // Find god nodes: degree > average * 2
     let degrees: Vec<(String, usize)> = graph
         .nodes()
         .iter()
@@ -84,7 +82,6 @@ pub fn export_wiki(
 
     fs::write(wiki_dir.join("index.md"), &index)?;
 
-    // --- Community pages ---
     for &cid in &sorted_cids {
         let members = &communities[&cid];
         let label = community_labels
@@ -110,7 +107,6 @@ pub fn export_wiki(
         }
         writeln!(page)?;
 
-        // Internal edges
         let member_set: std::collections::HashSet<&str> =
             members.iter().map(std::string::String::as_str).collect();
         let all_edges = graph.edges();
@@ -137,7 +133,6 @@ pub fn export_wiki(
         fs::write(wiki_dir.join(community_filename(cid)), &page)?;
     }
 
-    // --- God node pages ---
     for (nid, _) in &god_nodes {
         let node = match graph.get_node(nid) {
             Some(n) => n,
@@ -160,7 +155,6 @@ pub fn export_wiki(
         }
         writeln!(page)?;
 
-        // Related edges
         let all_edges = graph.edges();
         let related: Vec<_> = all_edges
             .iter()
@@ -226,7 +220,6 @@ mod tests {
             })
             .unwrap();
         }
-        // Make n0 a hub
         for i in 1..5 {
             kg.add_edge(GraphEdge {
                 source: "n0".into(),

@@ -34,7 +34,6 @@ pub(crate) fn extract_kotlin(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Functions: `fun foo(`
     let mut functions: Vec<(String, String, usize, usize)> = Vec::new();
     let func_matches: Vec<_> = RE_KT_FUNC.captures_iter(source).collect();
     for (i, cap) in func_matches.iter().enumerate() {
@@ -55,7 +54,6 @@ pub(crate) fn extract_kotlin(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Imports
     for cap in RE_KT_IMPORT.captures_iter(source) {
         let module = &cap[1];
         let line = line_of(source, &cap);
@@ -83,6 +81,3 @@ pub(crate) fn extract_kotlin(path: &Path, source: &str) -> ExtractionResult {
 
     result
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Generic fallback (Scala, PHP, Swift, Lua, Zig, PowerShell, Elixir, ObjC, Julia)

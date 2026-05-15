@@ -89,7 +89,6 @@ fn dispatch(graph: &KnowledgeGraph, request: &Value) -> Option<Value> {
             ))
         }
         "notifications/initialized" => {
-            // Notification — no response needed
             debug!("Client initialized");
             None
         }
@@ -105,7 +104,6 @@ fn dispatch(graph: &KnowledgeGraph, request: &Value) -> Option<Value> {
         "tools/call" => Some(dispatch_tools_call(graph, request)),
         "ping" => Some(jsonrpc_response(id, json!({}))),
         _ => {
-            // Unknown method — return error if it has an id (i.e. it's a request, not a notification)
             if id.is_null() {
                 None // notification, ignore
             } else {
@@ -119,15 +117,10 @@ fn dispatch(graph: &KnowledgeGraph, request: &Value) -> Option<Value> {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Server entry point
-// ---------------------------------------------------------------------------
-
 /// Start the MCP server, reading JSON-RPC requests from stdin and writing
 /// responses to stdout. Logs go to stderr so they don't interfere with the
 /// protocol.
 pub fn run_mcp_server(graph_path: &Path) -> Result<(), ServeError> {
-    // Redirect tracing to stderr (already the default for tracing_subscriber)
     let graph = crate::load_graph(graph_path)?;
     let stats = crate::graph_stats(&graph);
     let null = Value::Null;
@@ -187,10 +180,6 @@ pub fn run_mcp_server(graph_path: &Path) -> Result<(), ServeError> {
     info!("MCP server shutting down");
     Ok(())
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -376,7 +365,6 @@ mod tests {
         let mut g = KnowledgeGraph::new();
         g.add_node(make_node("a", "A", None)).unwrap();
         g.add_node(make_node("b", "B", None)).unwrap();
-        // No edge between them
         let req = json!({
             "jsonrpc": "2.0", "method": "tools/call", "id": 11,
             "params": {"name": "shortest_path", "arguments": {"source": "a", "target": "b"}}

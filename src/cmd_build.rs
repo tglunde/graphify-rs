@@ -28,7 +28,6 @@ pub async fn cmd_build(
     let output_dir = PathBuf::from(output);
     let cache_dir = output_dir.join("cache");
 
-    // Determine which formats to export (empty = all)
     let all_formats = [
         "json", "html", "graphml", "cypher", "svg", "wiki", "obsidian", "report",
     ];
@@ -39,13 +38,10 @@ pub async fn cmd_build(
     };
     let should_export = |name: &str| selected.iter().any(|s| s.eq_ignore_ascii_case(name));
 
-    // ── Step 1: Detect files ──
     let detection = step_detect(&root, update, verb)?;
 
-    // ── Step 2: Extract AST (Pass 1 — deterministic, with per-file cache) ──
     let mut extractions = step_extract_ast(&root, &cache_dir, &detection, code_only, verb)?;
 
-    // ── Step 2b: Semantic extraction (Pass 2 — LLM API, concurrent) ──
     if !no_llm && !code_only {
         step_extract_semantic(
             &root,
@@ -59,7 +55,6 @@ pub async fn cmd_build(
         .await;
     }
 
-    // ── Step 3: Build graph ──
     info_print!(verb, "  {} graph...", "Building".cyan());
     let mut graph = graphify_build::build(&extractions).context("Failed to build graph")?;
     info_print!(
@@ -69,20 +64,17 @@ pub async fn cmd_build(
         graph.edge_count().to_string().bold()
     );
 
-    // ── Step 4: Cluster ──
     let ClusterResult {
         communities,
         cohesion,
         community_labels,
     } = step_cluster(&mut graph, verb);
 
-    // ── Step 5: Analyze ──
     info_print!(verb, "  {} graph...", "Analyzing".cyan());
     let god_list = graphify_analyze::god_nodes(&graph, 10);
     let surprise_list = graphify_analyze::surprising_connections(&graph, &communities, 5);
     let questions = graphify_analyze::suggest_questions(&graph, &communities, &community_labels, 7);
 
-    // ── Step 6: Export selected formats ──
     step_export(
         &graph,
         &communities,
@@ -108,10 +100,6 @@ pub async fn cmd_build(
 
     Ok(())
 }
-
-// ---------------------------------------------------------------------------
-// Step 1: Detect
-// ---------------------------------------------------------------------------
 
 fn step_detect(
     root: &Path,
@@ -165,10 +153,6 @@ fn step_detect(
     Ok(detection)
 }
 
-// ---------------------------------------------------------------------------
-// Step 2: Extract AST
-// ---------------------------------------------------------------------------
-
 fn step_extract_ast(
     root: &Path,
     cache_dir: &Path,
@@ -208,7 +192,6 @@ fn step_extract_ast(
         Some(pb)
     };
 
-    // Parallel extraction: each file is processed independently, results collected
     let file_results: Vec<graphify_core::model::ExtractionResult> = code_files
         .par_iter()
         .map(|file_path| {
@@ -221,7 +204,6 @@ fn step_extract_ast(
                         .to_string(),
                 );
             }
-            // Try loading from cache
             if let Some(cached) = graphify_cache::load_cached_from::<
                 graphify_core::model::ExtractionResult,
             >(file_path, root, cache_dir)
@@ -232,7 +214,6 @@ fn step_extract_ast(
                 }
                 return cached;
             }
-            // Extract fresh — catch panics to not abort the entire pipeline
             let result = if let Ok(fresh) =
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     graphify_extract::extract(std::slice::from_ref(file_path))
@@ -250,7 +231,6 @@ fn step_extract_ast(
         })
         .collect();
 
-    // Merge all results
     let mut ast_result = graphify_core::model::ExtractionResult::default();
     for partial in file_results {
         ast_result.nodes.extend(partial.nodes);
@@ -288,10 +268,6 @@ fn step_extract_ast(
 
     Ok(vec![ast_result])
 }
-
-// ---------------------------------------------------------------------------
-// Step 2b: Semantic extraction
-// ---------------------------------------------------------------------------
 
 async fn step_extract_semantic(
     root: &Path,
@@ -354,10 +330,8 @@ async fn step_extract_semantic(
                 Some(pb)
             };
 
-            // Collect tasks for concurrent execution
             let mut handles = Vec::new();
             for doc_path in &doc_files {
-                // Check cache first (synchronous, on main thread)
                 if let Some(cached) = graphify_cache::load_cached_from::<
                     graphify_core::model::ExtractionResult,
                 >(doc_path, root, cache_dir)
@@ -398,7 +372,6 @@ async fn step_extract_semantic(
                 handles.push(handle);
             }
 
-            // Collect results
             for handle in handles {
                 match handle.await {
                     Ok(Ok((doc_p, sem_result))) => {
@@ -465,7 +438,6 @@ fn resolve_llm_config(
             }
         }
     } else {
-        // Backward compat: ANTHROPIC_API_KEY env var → Anthropic provider
         std::env::var("ANTHROPIC_API_KEY").ok().map(|key| {
             graphify_extract::semantic::LLMProviderConfig::resolve(
                 &graphify_extract::semantic::LLMConfigRaw {
@@ -479,10 +451,6 @@ fn resolve_llm_config(
         })
     }
 }
-
-// ---------------------------------------------------------------------------
-// Step 4: Cluster
-// ---------------------------------------------------------------------------
 
 struct ClusterResult {
     communities: HashMap<usize, Vec<String>>,
@@ -498,7 +466,6 @@ fn step_cluster(
     let communities = graphify_cluster::cluster(graph);
     let cohesion = graphify_cluster::score_all(graph, &communities);
 
-    // Write community assignments back into graph nodes
     for (&cid, members) in &communities {
         for nid in members {
             if let Some(node) = graph.get_node_mut(nid) {
@@ -560,10 +527,6 @@ fn step_cluster(
         community_labels,
     }
 }
-
-// ---------------------------------------------------------------------------
-// Step 6: Export
-// ---------------------------------------------------------------------------
 
 #[allow(clippy::too_many_arguments)]
 fn step_export(
@@ -680,7 +643,6 @@ fn step_export(
         );
     }
 
-    // Save manifest for future --update runs
     let manifest_path = output_dir.join(".graphify_manifest.json");
     let manifest = graphify_detect::Manifest {
         files: detection

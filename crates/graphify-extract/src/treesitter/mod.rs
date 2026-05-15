@@ -72,7 +72,6 @@ fn extract_with_treesitter(
         walk_node(root, source, config, &mut ctx, None);
     }
 
-    // Call-graph pass: match known function names in function bodies
     let label_to_nid: HashMap<String, String> = nodes
         .iter()
         .filter(|n| matches!(n.node_type, NodeType::Function | NodeType::Method))

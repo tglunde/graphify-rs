@@ -18,7 +18,6 @@ pub(crate) fn extract_csharp(path: &Path, source: &str) -> ExtractionResult {
     let lines: Vec<&str> = source.lines().collect();
     let ps = path_str(path);
 
-    // Classes / interfaces / structs / enums
     for cap in RE_CS_CLASS.captures_iter(source) {
         let kind = &cap[1];
         let name = &cap[2];
@@ -41,7 +40,6 @@ pub(crate) fn extract_csharp(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // Methods
     let mut functions: Vec<(String, String, usize, usize)> = Vec::new();
     let func_matches: Vec<_> = RE_CS_METHOD.captures_iter(source).collect();
     for (i, cap) in func_matches.iter().enumerate() {
@@ -69,7 +67,6 @@ pub(crate) fn extract_csharp(path: &Path, source: &str) -> ExtractionResult {
         ));
     }
 
-    // using directives
     for cap in RE_CS_USING.captures_iter(source) {
         let ns = &cap[1];
         let line = line_of(source, &cap);
@@ -97,6 +94,3 @@ pub(crate) fn extract_csharp(path: &Path, source: &str) -> ExtractionResult {
 
     result
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Kotlin

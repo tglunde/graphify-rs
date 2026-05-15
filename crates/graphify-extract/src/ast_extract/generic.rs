@@ -18,7 +18,6 @@ pub(crate) fn extract_generic(path: &Path, source: &str, _lang: &str) -> Extract
     let lines: Vec<&str> = source.lines().collect();
     let ps = path_str(path);
 
-    // Generic class/struct/module pattern
     for cap in RE_GEN_CLASS.captures_iter(source) {
         let name = &cap[1];
         let line = line_of(source, &cap);
@@ -34,7 +33,6 @@ pub(crate) fn extract_generic(path: &Path, source: &str, _lang: &str) -> Extract
         ));
     }
 
-    // Generic function pattern
     let mut functions: Vec<(String, String, usize, usize)> = Vec::new();
     let func_matches: Vec<_> = RE_GEN_FUNC.captures_iter(source).collect();
     for (i, cap) in func_matches.iter().enumerate() {
@@ -55,7 +53,6 @@ pub(crate) fn extract_generic(path: &Path, source: &str, _lang: &str) -> Extract
         ));
     }
 
-    // Generic import pattern
     for cap in RE_GEN_IMPORT.captures_iter(source) {
         let module = &cap[1];
         let line = line_of(source, &cap);
@@ -83,5 +80,3 @@ pub(crate) fn extract_generic(path: &Path, source: &str, _lang: &str) -> Extract
 
     result
 }
-
-// Tests moved to tests/ast_extract.rs (integration tests)

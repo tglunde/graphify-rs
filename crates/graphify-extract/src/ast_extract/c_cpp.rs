@@ -42,7 +42,6 @@ pub(crate) fn extract_c_cpp(path: &Path, source: &str, lang: &str) -> Extraction
         ));
     }
 
-    // C++ classes / structs / namespaces
     if lang == "cpp" {
         for cap in RE_CPP_CLASS.captures_iter(source) {
             let name = &cap[1];
@@ -60,7 +59,6 @@ pub(crate) fn extract_c_cpp(path: &Path, source: &str, lang: &str) -> Extraction
         }
     }
 
-    // C structs
     if lang == "c" {
         for cap in RE_C_STRUCT.captures_iter(source) {
             let name = &cap[1];
@@ -78,7 +76,6 @@ pub(crate) fn extract_c_cpp(path: &Path, source: &str, lang: &str) -> Extraction
         }
     }
 
-    // Functions: `type name(` at start of line (heuristic)
     let mut functions: Vec<(String, String, usize, usize)> = Vec::new();
     let func_matches: Vec<_> = RE_C_FUNC.captures_iter(source).collect();
     for (i, cap) in func_matches.iter().enumerate() {

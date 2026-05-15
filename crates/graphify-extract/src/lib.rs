@@ -22,10 +22,6 @@ use graphify_core::model::{ExtractionResult, GraphEdge, NodeType};
 use rayon::prelude::*;
 use tracing::{debug, info, warn};
 
-// ---------------------------------------------------------------------------
-// Extension → language dispatch table
-// ---------------------------------------------------------------------------
-
 /// Maps file extensions to language identifiers used by the extraction engine.
 pub const DISPATCH: &[(&str, &str)] = &[
     (".py", "python"),
@@ -74,10 +70,6 @@ pub fn language_for_path(path: &Path) -> Option<&'static str> {
     dispatch_map().get(&*format!(".{ext}")).copied()
 }
 
-// ---------------------------------------------------------------------------
-// File collection
-// ---------------------------------------------------------------------------
-
 /// Recursively collect all supported source files under `target`.
 pub fn collect_files(target: &Path) -> Vec<PathBuf> {
     let map = dispatch_map();
@@ -98,7 +90,6 @@ fn collect_files_inner(dir: &Path, map: &HashMap<&str, &str>, out: &mut Vec<Path
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            // Skip hidden dirs and common vendor dirs
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if name.starts_with('.')
                 || name == "node_modules"
@@ -119,10 +110,6 @@ fn collect_files_inner(dir: &Path, map: &HashMap<&str, &str>, out: &mut Vec<Path
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Main extraction entry point
-// ---------------------------------------------------------------------------
 
 /// Run Pass 1 extraction on a set of file paths.
 ///
@@ -152,7 +139,6 @@ pub fn extract(paths: &[PathBuf]) -> ExtractionResult {
 
             debug!("extracting {} ({})", path.display(), lang);
 
-            // Try tree-sitter first, fall back to regex
             let mut result = if let Some(ts_result) = treesitter::try_extract(path, &source, lang) {
                 debug!("used tree-sitter for {} ({})", path.display(), lang);
                 ts_result
@@ -173,10 +159,8 @@ pub fn extract(paths: &[PathBuf]) -> ExtractionResult {
         combined.hyperedges.extend(r.hyperedges);
     }
 
-    // Cross-file import resolution for Python
     resolve_python_imports(&mut combined);
 
-    // Cross-file import resolution for JS/TS, Go, and Rust
     resolve_cross_file_imports(&mut combined);
 
     info!(
@@ -193,7 +177,6 @@ pub fn extract(paths: &[PathBuf]) -> ExtractionResult {
 ///
 /// Also handles `from x import *` by expanding to all entities in module x.
 fn resolve_python_imports(result: &mut ExtractionResult) {
-    // Build a lookup from node label → [(id, source_file)]
     let label_to_ids: HashMap<String, Vec<(String, String)>> = {
         let mut map: HashMap<String, Vec<(String, String)>> = HashMap::new();
         for n in &result.nodes {
@@ -204,7 +187,6 @@ fn resolve_python_imports(result: &mut ExtractionResult) {
         map
     };
 
-    // Build module stem → [entity_id] for star import expansion
     let mut stem_to_entity_ids: HashMap<String, Vec<String>> = HashMap::new();
     let defined_targets: HashSet<String> = result
         .edges
@@ -227,13 +209,10 @@ fn resolve_python_imports(result: &mut ExtractionResult) {
             .push(node.id.clone());
     }
 
-    // Collect star import edges for expansion
     let mut star_expansions: Vec<GraphEdge> = Vec::new();
 
-    // For every edge with relation "imports", try to resolve the target
     for edge in &mut result.edges {
         if edge.relation == "imports" {
-            // Check for star import: target label contains "*"
             let import_label = result
                 .nodes
                 .iter()
@@ -258,18 +237,15 @@ fn resolve_python_imports(result: &mut ExtractionResult) {
                         });
                     }
                 }
-            } else {
-                // Regular import — resolve by label, prefer same-file match
-                if let Some(candidates) = label_to_ids.get(&edge.target) {
-                    let resolved = candidates
-                        .iter()
-                        .find(|(_, sf)| sf == &edge.source_file)
-                        .or_else(|| candidates.first())
-                        .map(|(id, _)| id.clone());
-                    if let Some(resolved_id) = resolved {
-                        edge.target = resolved_id;
-                        edge.confidence = graphify_core::confidence::Confidence::Extracted;
-                    }
+            } else if let Some(candidates) = label_to_ids.get(&edge.target) {
+                let resolved = candidates
+                    .iter()
+                    .find(|(_, sf)| sf == &edge.source_file)
+                    .or_else(|| candidates.first())
+                    .map(|(id, _)| id.clone());
+                if let Some(resolved_id) = resolved {
+                    edge.target = resolved_id;
+                    edge.confidence = graphify_core::confidence::Confidence::Extracted;
                 }
             }
         }
@@ -291,17 +267,12 @@ fn resolve_python_imports(result: &mut ExtractionResult) {
 /// entities defined in the target module. This turns file-level import edges
 /// into entity-level relationship edges.
 fn resolve_cross_file_imports(result: &mut ExtractionResult) {
-    // Step 1: Build lookup indexes in a single pass over nodes.
-    //   - id_to_label: node_id → label (for fast import label lookup)
-    //   - stem_to_entities: file_stem → [(label, node_id, node_type)]
-    //   - go_pkg_to_entities: go_dir_name → [(label, node_id, node_type)]
     let mut id_to_label: HashMap<String, String> = HashMap::new();
     let mut stem_to_entities: HashMap<String, Vec<(String, String, NodeType)>> = HashMap::new();
     let mut go_pkg_to_entities: HashMap<String, Vec<(String, String, NodeType)>> = HashMap::new();
     let mut source_file_to_stem: HashMap<String, String> = HashMap::new();
     let mut file_id_to_source: HashMap<String, String> = HashMap::new();
 
-    // Collect defined entity IDs from edges (one pass)
     let defined_entity_ids: HashSet<String> = result
         .edges
         .iter()
@@ -309,7 +280,6 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
         .map(|e| e.target.clone())
         .collect();
 
-    // Build source_file → [entity_node_id] and id_to_label in one pass over edges
     let mut source_file_entities: HashMap<String, Vec<String>> = HashMap::new();
     for edge in &result.edges {
         if edge.relation == "defines" {
@@ -320,7 +290,6 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
         }
     }
 
-    // Single pass over nodes to build all indexes
     for node in &result.nodes {
         id_to_label.insert(node.id.clone(), node.label.clone());
 
@@ -352,7 +321,6 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
             node.node_type.clone(),
         ));
 
-        // Go package grouping
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if ext == "go"
             && let Some(dir) = path
@@ -367,7 +335,6 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
         }
     }
 
-    // Step 2: Resolve imports → create uses edges
     let mut new_edges: Vec<GraphEdge> = Vec::new();
     let mut seen = HashSet::new();
 
@@ -382,7 +349,6 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
             .and_then(|e| e.to_str())
             .unwrap_or("");
 
-        // O(1) lookup instead of linear scan
         let import_label = match id_to_label.get(&edge.target) {
             Some(label) => label.as_str(),
             None => continue,
@@ -425,15 +391,11 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
             continue;
         }
 
-        // Get the importing file's own entities
         let local_entities = match source_file_entities.get(source_file) {
             Some(ids) => ids,
             None => continue,
         };
 
-        // Create uses edges: match local entities to target entities by label
-        // instead of the full cartesian product (local × target), which would
-        // create O(N*M) spurious edges for large files.
         let target_by_label: HashMap<&str, &String> = target_entities
             .iter()
             .filter_map(|(lbl, id, _)| {
@@ -451,8 +413,6 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
                 None => continue,
             };
 
-            // If a target entity has the same label as the local entity,
-            // that's a strong signal of a real usage relationship.
             if let Some(&target_id) = target_by_label.get(local_label.as_str()) {
                 if local_id == target_id {
                     continue;
@@ -476,8 +436,6 @@ fn resolve_cross_file_imports(result: &mut ExtractionResult) {
                 continue;
             }
 
-            // Fallback: create edges to all target entities, but cap per import
-            // to avoid O(N*M) explosion for files with many entities.
             const MAX_FALLBACK_EDGES: usize = 50;
             let mut fallback_count = 0;
             for (_, target_id, _) in &target_entities {
@@ -531,12 +489,10 @@ fn resolve_jsts_import<'a>(
     import_label: &str,
     stem_to_entities: &'a HashMap<String, Vec<(String, String, NodeType)>>,
 ) -> Vec<&'a (String, String, NodeType)> {
-    // Strip alias: "Foo as Bar" → "Foo"
     let label = import_label.split(" as ").next().unwrap_or(import_label);
 
     let parts: Vec<&str> = label.split('/').collect();
 
-    // Try the first segment as module stem (for "module/Name" patterns)
     if parts.len() >= 2 {
         let module_stem = parts[0].trim_start_matches('.');
         if let Some(entities) = stem_to_entities.get(module_stem) {
@@ -544,7 +500,6 @@ fn resolve_jsts_import<'a>(
         }
     }
 
-    // Try the last segment as file stem (for path-style imports)
     if let Some(last) = parts.last() {
         let stem = last.trim_start_matches('.');
         if let Some(entities) = stem_to_entities.get(stem) {
@@ -552,13 +507,11 @@ fn resolve_jsts_import<'a>(
         }
     }
 
-    // Try the whole label as a stem (for simple imports like "React")
     let simple = label.trim_start_matches("./").trim_start_matches("../");
     if let Some(entities) = stem_to_entities.get(simple) {
         return entities.iter().collect();
     }
 
-    // Barrel export: if the last segment matches a directory, check for "index" file
     if let Some(entities) = stem_to_entities.get("index")
         && (label.contains('/') || label.starts_with('.'))
     {
@@ -578,11 +531,9 @@ fn resolve_go_import<'a>(
     stem_to_entities: &'a HashMap<String, Vec<(String, String, NodeType)>>,
     go_pkg_to_entities: &'a HashMap<String, Vec<(String, String, NodeType)>>,
 ) -> Vec<&'a (String, String, NodeType)> {
-    // Strip dot import prefix, blank import prefix, or alias
     let label = import_label
         .trim_start_matches(". ")
         .trim_start_matches("_ ");
-    // Also strip any remaining alias: `alias "path"` → `"path"`
     let label = if label.contains('"') {
         label.split('"').nth(1).unwrap_or(label)
     } else {
@@ -615,7 +566,6 @@ fn resolve_rust_import<'a>(
         .unwrap_or(import_label);
     let segments: Vec<&str> = label.split("::").collect();
 
-    // Glob import: `use module::*` → return all entities from module
     if segments.last() == Some(&"*") && segments.len() >= 2 {
         let module = segments[segments.len() - 2];
         if let Some(entities) = stem_to_entities.get(module) {
@@ -623,7 +573,6 @@ fn resolve_rust_import<'a>(
         }
     }
 
-    // Try the last segment as a module/file stem
     if let Some(last) = segments.last()
         && *last != "*"
         && let Some(entities) = stem_to_entities.get(*last)
@@ -631,7 +580,6 @@ fn resolve_rust_import<'a>(
         return entities.iter().collect();
     }
 
-    // Try the second-to-last segment (for `crate::module::Type` patterns)
     if segments.len() >= 2 {
         let module = segments[segments.len() - 2];
         if let Some(entities) = stem_to_entities.get(module) {
@@ -655,7 +603,6 @@ fn resolve_dot_import<'a>(
     import_label: &str,
     stem_to_entities: &'a HashMap<String, Vec<(String, String, NodeType)>>,
 ) -> Vec<&'a (String, String, NodeType)> {
-    // Strip common prefixes: "static ", alias part after " = "
     let label = import_label.strip_prefix("static ").unwrap_or(import_label);
     let label = if let Some(idx) = label.find(" = ") {
         label[idx + 3..].trim()
@@ -665,14 +612,12 @@ fn resolve_dot_import<'a>(
 
     let segments: Vec<&str> = label.split('.').collect();
 
-    // Try the last segment as a type/entity name matching a file stem
     if let Some(last) = segments.last()
         && let Some(entities) = stem_to_entities.get(*last)
     {
         return entities.iter().collect();
     }
 
-    // Try second-to-last as module, filter to last segment
     if segments.len() >= 2 {
         let module = segments[segments.len() - 2];
         if let Some(entities) = stem_to_entities.get(module) {
@@ -696,14 +641,12 @@ fn resolve_c_include<'a>(
     import_label: &str,
     stem_to_entities: &'a HashMap<String, Vec<(String, String, NodeType)>>,
 ) -> Vec<&'a (String, String, NodeType)> {
-    // Strip angle brackets and quotes
     let label = import_label
         .trim_start_matches('<')
         .trim_end_matches('>')
         .trim_start_matches('"')
         .trim_end_matches('"');
 
-    // Strip extension (.h, .hpp, etc.)
     let stem = std::path::Path::new(label)
         .file_stem()
         .and_then(|s| s.to_str())
@@ -725,14 +668,12 @@ fn resolve_backslash_import<'a>(
 ) -> Vec<&'a (String, String, NodeType)> {
     let segments: Vec<&str> = import_label.split('\\').collect();
 
-    // Try the last segment as entity name
     if let Some(last) = segments.last()
         && let Some(entities) = stem_to_entities.get(*last)
     {
         return entities.iter().collect();
     }
 
-    // Try second-to-last as module
     if segments.len() >= 2 {
         let module = segments[segments.len() - 2];
         if let Some(entities) = stem_to_entities.get(module) {
@@ -751,10 +692,8 @@ fn resolve_dart_import<'a>(
     import_label: &str,
     stem_to_entities: &'a HashMap<String, Vec<(String, String, NodeType)>>,
 ) -> Vec<&'a (String, String, NodeType)> {
-    // Start with the full import label
     let mut label = import_label;
 
-    // Strip common prefixes: "import ", "export ", "part "
     if let Some(stripped) = label.strip_prefix("import ") {
         label = stripped;
     } else if let Some(stripped) = label.strip_prefix("export ") {
@@ -763,8 +702,6 @@ fn resolve_dart_import<'a>(
         label = stripped;
     }
 
-    // Step 1: Handle aliased imports like "utils.dart' as utils"
-    // Extract the path part before " as "
     let path_and_alias = label;
     let path_part = if let Some(idx) = path_and_alias.find(" as ") {
         &path_and_alias[..idx]
@@ -772,8 +709,6 @@ fn resolve_dart_import<'a>(
         path_and_alias
     };
 
-    // Step 2: Handle deferred imports like "heavy.dart' deferred as heavy"
-    // Extract the path part before " deferred"
     let path_deferred = path_part;
     let path_no_deferred = if let Some(idx) = path_deferred.find(" deferred") {
         &path_deferred[..idx]
@@ -781,40 +716,28 @@ fn resolve_dart_import<'a>(
         path_deferred
     };
 
-    // Step 3: Strip quotes
     let quoted = path_no_deferred.trim();
     let unquoted = quoted
         .trim_matches('\'') // Single quote character
         .trim_matches('"');
 
-    // Step 4: Handle relative imports with "../" - resolve up to file stem
     let normalized = if unquoted.contains("../") {
-        // For relative imports, just take the last segment (filename)
-        // e.g., "../models/user.dart" -> "user"
         let last_segment = unquoted.rsplit('/').next().unwrap_or(unquoted);
         last_segment.strip_suffix(".dart").unwrap_or(last_segment)
     } else {
-        // Step 5: Strip "package:" prefix
         let path_part = unquoted.strip_prefix("package:").unwrap_or(unquoted);
 
-        // Step 6: Extract last path segment (filename)
         let last_segment = path_part.rsplit('/').next().unwrap_or(path_part);
 
-        // Step 7: Strip .dart extension
         last_segment.strip_suffix(".dart").unwrap_or(last_segment)
     };
 
-    // Look up the stem in the entities map
     if let Some(entities) = stem_to_entities.get(normalized) {
         return entities.iter().collect();
     }
 
     Vec::new()
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests;
