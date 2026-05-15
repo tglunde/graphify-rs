@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use super::{
+    RE_JAVA_CLASS, RE_JAVA_IMPORT, RE_JAVA_METHOD, end_line_at, infer_calls, line_of, make_edge,
+    make_file_node, make_node, path_str,
+};
 use graphify_core::confidence::Confidence;
 use graphify_core::id::make_id;
 use graphify_core::model::{ExtractionResult, GraphNode, NodeType};
-use super::{end_line_at, infer_calls, line_of, make_edge, make_file_node, make_node, path_str, RE_JAVA_CLASS, RE_JAVA_METHOD, RE_JAVA_IMPORT};
 
 pub(crate) fn extract_java(path: &Path, source: &str) -> ExtractionResult {
     let mut result = ExtractionResult::default();

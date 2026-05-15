@@ -139,7 +139,13 @@ fn days_since_epoch_2020(date_str: &str) -> Option<u64> {
     } else {
         0
     };
-    Some((y.saturating_sub(2020)) * 365 + CUM_DAYS.get(m as usize - 1).copied().unwrap_or(0) + leap_extra + d - 1)
+    Some(
+        (y.saturating_sub(2020)) * 365
+            + CUM_DAYS.get(m as usize - 1).copied().unwrap_or(0)
+            + leap_extra
+            + d
+            - 1,
+    )
 }
 
 /// Approximate days since 2020-01-01 for "now".

@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use tracing::trace;
+use super::{
+    RE_PY_CLASS, RE_PY_CLASS_LOOKUP, RE_PY_FUNC, RE_PY_IMPORT, end_line_at, infer_calls, line_of,
+    make_edge, make_file_node, make_node, path_str,
+};
 use graphify_core::confidence::Confidence;
 use graphify_core::id::make_id;
 use graphify_core::model::{ExtractionResult, GraphNode, NodeType};
-use super::{end_line_at, infer_calls, line_of, make_edge, make_file_node, make_node, path_str, RE_PY_CLASS, RE_PY_CLASS_LOOKUP, RE_PY_FUNC, RE_PY_IMPORT};
+use tracing::trace;
 
 pub(crate) fn extract_python(path: &Path, source: &str) -> ExtractionResult {
     let mut result = ExtractionResult::default();

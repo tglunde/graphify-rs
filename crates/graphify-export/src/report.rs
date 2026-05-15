@@ -117,8 +117,7 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
         writeln!(report, "| Node | Degree | Community |")?;
         writeln!(report, "|------|--------|-----------|")?;
         for gn in god_nodes {
-            let comm = gn
-                .community.map_or_else(|| "–".into(), |c| c.to_string());
+            let comm = gn.community.map_or_else(|| "–".into(), |c| c.to_string());
             writeln!(report, "| {} | {} | {} |", gn.label, gn.degree, comm)?;
         }
     }
@@ -131,7 +130,11 @@ pub fn generate_report(input: &ReportInput) -> anyhow::Result<String> {
         writeln!(report, "_No surprising connections found._")?;
     } else {
         for s in surprises {
-            writeln!(report, "- **{}** → **{}** ({})", s.source, s.target, s.relation)?;
+            writeln!(
+                report,
+                "- **{}** → **{}** ({})",
+                s.source, s.target, s.relation
+            )?;
         }
     }
     writeln!(report)?;

@@ -107,8 +107,9 @@ pub fn export_svg(
             let cid = node
                 .community
                 .or_else(|| node_community.get(node.id.as_str()).copied());
-            let color = cid
-                .map_or(FALLBACK_COLOR, |c| COMMUNITY_COLORS[c % COMMUNITY_COLORS.len()]);
+            let color = cid.map_or(FALLBACK_COLOR, |c| {
+                COMMUNITY_COLORS[c % COMMUNITY_COLORS.len()]
+            });
             writeln!(
                 svg,
                 "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"{}\" fill=\"{}\" opacity=\"0.85\"><title>{}</title></circle>",

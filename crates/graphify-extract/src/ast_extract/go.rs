@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use super::{
+    RE_GO_FUNC, RE_GO_IMPORT_BLOCK, RE_GO_IMPORT_LINE, RE_GO_IMPORT_SINGLE, RE_GO_TYPE,
+    end_line_at, full_match, infer_calls, line_of, make_edge, make_file_node, make_node, path_str,
+};
 use graphify_core::confidence::Confidence;
 use graphify_core::id::make_id;
 use graphify_core::model::{ExtractionResult, GraphNode, NodeType};
-use super::{end_line_at, full_match, infer_calls, line_of, make_edge, make_file_node, make_node, path_str, RE_GO_TYPE, RE_GO_FUNC, RE_GO_IMPORT_SINGLE, RE_GO_IMPORT_BLOCK, RE_GO_IMPORT_LINE};
 
 pub(crate) fn extract_go(path: &Path, source: &str) -> ExtractionResult {
     let mut result = ExtractionResult::default();

@@ -6,8 +6,8 @@ use graphify_core::id::make_id;
 use graphify_core::model::{ExtractionResult, GraphNode, NodeType};
 
 use super::{
-    end_line_at, infer_calls, line_of, make_edge, make_file_node, make_node, path_str,
-    RE_C_FUNC, RE_C_INCLUDE, RE_C_STRUCT, RE_CPP_CLASS,
+    RE_C_FUNC, RE_C_INCLUDE, RE_C_STRUCT, RE_CPP_CLASS, end_line_at, infer_calls, line_of,
+    make_edge, make_file_node, make_node, path_str,
 };
 
 pub(crate) fn extract_c_cpp(path: &Path, source: &str, lang: &str) -> ExtractionResult {

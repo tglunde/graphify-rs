@@ -43,12 +43,7 @@ fn read_token_from_file(path: &std::path::Path) -> Option<String> {
 
     // Try common field names for OAuth access tokens
     // Note: "apiKey" is excluded — it should be used via AuthType::ApiKey, not Bearer
-    for field in &[
-        "accessToken",
-        "access_token",
-        "oauthToken",
-        "token",
-    ] {
+    for field in &["accessToken", "access_token", "oauthToken", "token"] {
         if let Some(val) = json
             .get(*field)
             .and_then(|v| v.as_str())

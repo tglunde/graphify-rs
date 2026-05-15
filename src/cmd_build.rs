@@ -70,8 +70,11 @@ pub async fn cmd_build(
     );
 
     // ── Step 4: Cluster ──
-    let ClusterResult { communities, cohesion, community_labels } =
-        step_cluster(&mut graph, verb);
+    let ClusterResult {
+        communities,
+        cohesion,
+        community_labels,
+    } = step_cluster(&mut graph, verb);
 
     // ── Step 5: Analyze ──
     info_print!(verb, "  {} graph...", "Analyzing".cyan());
@@ -230,9 +233,10 @@ fn step_extract_ast(
                 return cached;
             }
             // Extract fresh — catch panics to not abort the entire pipeline
-            let result = if let Ok(fresh) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                graphify_extract::extract(std::slice::from_ref(file_path))
-            })) {
+            let result = if let Ok(fresh) =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    graphify_extract::extract(std::slice::from_ref(file_path))
+                })) {
                 let _ = graphify_cache::save_cached_to(file_path, &fresh, root, cache_dir);
                 fresh
             } else {
@@ -364,7 +368,9 @@ async fn step_extract_semantic(
                     }
                     continue;
                 }
-                let content = if let Ok(c) = std::fs::read_to_string(doc_path) { c } else {
+                let content = if let Ok(c) = std::fs::read_to_string(doc_path) {
+                    c
+                } else {
                     if let Some(ref pb) = pb_sem {
                         pb.inc(1);
                     }
@@ -528,7 +534,8 @@ fn step_cluster(
                     .unwrap_or_else(|| {
                         nodes
                             .first()
-                            .and_then(|id| graph.get_node(id)).map_or_else(|| format!("Community {cid}"), |n| n.label.clone())
+                            .and_then(|id| graph.get_node(id))
+                            .map_or_else(|| format!("Community {cid}"), |n| n.label.clone())
                     });
                 let label = if used_labels.contains(&best) {
                     format!("{best} ({cid})")
@@ -547,7 +554,11 @@ fn step_cluster(
         communities.len().to_string().bold()
     );
 
-    ClusterResult { communities, cohesion, community_labels }
+    ClusterResult {
+        communities,
+        cohesion,
+        community_labels,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -587,12 +598,8 @@ fn step_export(
         )?;
         info_print!(verb, "  Wrote {}", html_path.display().to_string().dimmed());
 
-        let split_path = graphify_export::export_html_split(
-            graph,
-            communities,
-            community_labels,
-            output_dir,
-        )?;
+        let split_path =
+            graphify_export::export_html_split(graph, communities, community_labels, output_dir)?;
         info_print!(
             verb,
             "  Wrote {}/",
@@ -658,7 +665,8 @@ fn step_export(
     }
 
     if should_export("wiki") {
-        let wiki_path = graphify_export::export_wiki(graph, communities, community_labels, output_dir)?;
+        let wiki_path =
+            graphify_export::export_wiki(graph, communities, community_labels, output_dir)?;
         info_print!(verb, "  Wrote {}", wiki_path.display().to_string().dimmed());
     }
 

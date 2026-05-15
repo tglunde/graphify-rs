@@ -497,4 +497,3 @@ pub(crate) fn handle_find_similar(graph: &KnowledgeGraph, args: &Value) -> Value
         tool_result_json(&pairs)
     }
 }
-

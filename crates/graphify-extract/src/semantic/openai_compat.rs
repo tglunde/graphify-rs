@@ -73,9 +73,7 @@ pub async fn extract_openai_compatible(
     }
 
     let response = request.send().await.with_context(|| {
-        format!(
-            "Cannot connect to {base_url}. Make sure the server is running."
-        )
+        format!("Cannot connect to {base_url}. Make sure the server is running.")
     })?;
 
     if response.status().as_u16() == 401 {

@@ -135,7 +135,9 @@ pub fn extract(paths: &[PathBuf]) -> ExtractionResult {
     let results: Vec<ExtractionResult> = paths
         .par_iter()
         .filter_map(|path| {
-            let lang = if let Some(l) = language_for_path(path) { l } else {
+            let lang = if let Some(l) = language_for_path(path) {
+                l
+            } else {
                 debug!("skipping unsupported file: {}", path.display());
                 return None;
             };

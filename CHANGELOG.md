@@ -5,18 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2025-05-15
 
-### Added
-- Support multiple LLM providers for semantic extraction: Anthropic (with Claude Code OAuth), OpenAI, Ollama, and OpenAI-compatible endpoints (vLLM, LM Studio, etc.)
-- `[llm]` configuration section in `graphify.toml` for provider, model, API keys, and base URLs
-- Claude Code OAuth token reuse — automatically reads from `~/.claude/config.json` with expiry checking
-- Provider-specific error messages (e.g., `ollama pull` hint on model not found)
+### Breaking Changes
+
+- Tree-sitter handler functions now take `WalkContext` struct instead of 11 individual parameters
+
+### Fixed
+
+- `days_since_epoch_2020` off-by-one: `2020-01-01` now returns 0 instead of 1
+- `detect_incremental` eliminated double I/O — hashes computed during directory walk
+- `build_unique_var_names`/`build_unique_filenames` use `Vec::pop()` for deterministic single-element extraction
+- Cypher export uses `is_ascii_alphanumeric()` for Neo4j compatibility (CJK chars no longer break syntax)
+- `detect_incremental` binary files (images) now correctly compared against cached hashes
+- `resolve_cross_file_imports` fallback edges capped per import (MAX_FALLBACK_EDGES = 50)
+- Iterative Tarjan's SCC and DFS cycle detection (no stack overflow on large graphs)
+- `looks_like_paper` reads only first N bytes instead of entire file
+- Sensitive detection uses word-boundary matching (no false positives like "tokenizer.rs")
+- `make_id` preserves CJK characters with `is_alphanumeric()`
+- `cypher_escape` handles newlines (`\n`, `\r`)
+- Semantic extraction shows truncation notice for large files
+- `date_to_age` uses cumulative days table instead of 30-day/month approximation
+- Cache layer cleans up `.tmp` files on failed atomic rename
+- Eliminated production `unwrap()` / `panic!()` calls
+- `handle_shortest_path` removed unreachable None branch
+- `handle_get_neighbors` replaced `Vec` allocation with `count()` for edge counting
 
 ### Changed
-- Semantic extraction now shows provider name and model in build output
-- `ANTHROPIC_API_KEY` env var remains as backward-compatible fallback when `[llm]` config is absent
-- `graphify-extract` crate description updated to reflect multi-provider support
+
+- Split `ast_extract.rs` (1329 lines) into `mod.rs` + 10 language submodules
+- Split `treesitter/mod.rs` (1299 lines) into `mod.rs` + `handlers.rs` + `imports.rs`
+- Split `mcp.rs` (1309 lines) into `mod.rs` + `handlers.rs` + `tools.rs`
+- Introduced `WalkContext` struct to eliminate `too_many_arguments` clippy warnings
+- Removed redundant comments and decorative separators
 
 ## [0.4.5] - 2026-04-25
 
@@ -174,6 +195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git hook integration (post-commit, post-checkout)
 - CLI with 21 subcommands via clap derive
 
+[0.5.0]: https://github.com/TtTRz/graphify-rs/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/TtTRz/graphify-rs/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/TtTRz/graphify-rs/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/TtTRz/graphify-rs/compare/v0.4.2...v0.4.3

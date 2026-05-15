@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use super::{
+    RE_RS_ENUM, RE_RS_FUNC, RE_RS_IMPL, RE_RS_STRUCT, RE_RS_TRAIT, RE_RS_USE, end_line_at,
+    infer_calls, line_of, make_edge, make_file_node, make_node, path_str,
+};
 use graphify_core::confidence::Confidence;
 use graphify_core::id::make_id;
 use graphify_core::model::{ExtractionResult, GraphNode, NodeType};
-use super::{end_line_at, infer_calls, line_of, make_edge, make_file_node, make_node, path_str, RE_RS_STRUCT, RE_RS_ENUM, RE_RS_TRAIT, RE_RS_IMPL, RE_RS_FUNC, RE_RS_USE};
 
 pub(crate) fn extract_rust(path: &Path, source: &str) -> ExtractionResult {
     let mut result = ExtractionResult::default();

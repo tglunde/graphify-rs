@@ -259,8 +259,10 @@ pub(crate) fn extract_js_import(
                         let mut spec_cursor = inner.walk();
                         for spec in inner.children(&mut spec_cursor) {
                             if spec.kind() == "import_specifier" {
-                                let name = spec
-                                    .child_by_field_name("name").map_or_else(|| node_text(spec, source), |n| node_text(n, source));
+                                let name = spec.child_by_field_name("name").map_or_else(
+                                    || node_text(spec, source),
+                                    |n| node_text(n, source),
+                                );
                                 let full = format!("{module}/{name}");
                                 add_import_node(
                                     nodes,
@@ -512,4 +514,3 @@ pub(crate) fn add_import_node(
         extra: HashMap::new(),
     });
 }
-

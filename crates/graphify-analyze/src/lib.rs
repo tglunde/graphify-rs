@@ -499,7 +499,10 @@ fn compute_cohesion(graph: &KnowledgeGraph, community_nodes: &[String]) -> f64 {
     if n <= 1 {
         return 1.0;
     }
-    let node_set: HashSet<&str> = community_nodes.iter().map(std::string::String::as_str).collect();
+    let node_set: HashSet<&str> = community_nodes
+        .iter()
+        .map(std::string::String::as_str)
+        .collect();
     let mut actual_edges = 0usize;
     for node_id in community_nodes {
         for neighbor in graph.get_neighbors(node_id) {
@@ -799,4 +802,3 @@ pub mod temporal;
 
 #[cfg(test)]
 mod tests;
-

@@ -573,9 +573,10 @@ fn cmd_diff(old_path: &str, new_path: &str, output_format: &str) -> Result<()> {
             }
         }
 
-        let summary_added = added_nodes.map_or(0, std::vec::Vec::len) + added_edges.map_or(0, std::vec::Vec::len);
-        let summary_removed =
-            removed_nodes.map_or(0, std::vec::Vec::len) + removed_edges.map_or(0, std::vec::Vec::len);
+        let summary_added =
+            added_nodes.map_or(0, std::vec::Vec::len) + added_edges.map_or(0, std::vec::Vec::len);
+        let summary_removed = removed_nodes.map_or(0, std::vec::Vec::len)
+            + removed_edges.map_or(0, std::vec::Vec::len);
         println!(
             "\n{}: {} additions, {} removals",
             "Summary".bold(),

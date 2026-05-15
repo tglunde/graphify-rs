@@ -30,10 +30,7 @@ pub fn resolve_language(lang: &str) -> Option<(Language, TsConfig)> {
             tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
             js_config(),
         )),
-        "tsx" => Some((
-            tree_sitter_typescript::LANGUAGE_TSX.into(),
-            js_config(),
-        )),
+        "tsx" => Some((tree_sitter_typescript::LANGUAGE_TSX.into(), js_config())),
         "rust" => Some((tree_sitter_rust::LANGUAGE.into(), rust_config())),
         "go" => Some((tree_sitter_go::LANGUAGE.into(), go_config())),
         "java" => Some((tree_sitter_java::LANGUAGE.into(), java_config())),

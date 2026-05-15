@@ -101,9 +101,7 @@ pub fn export_wiki(
         for nid in members {
             let node = graph.get_node(nid);
             let node_label = node.map_or(nid.as_str(), |n| n.label.as_str());
-            let node_type = node
-                .map(|n| format!("{}", n.node_type))
-                .unwrap_or_default();
+            let node_type = node.map(|n| format!("{}", n.node_type)).unwrap_or_default();
             let degree = graph.degree(nid);
             writeln!(
                 page,
@@ -155,7 +153,9 @@ pub fn export_wiki(
             writeln!(page, "- **Location:** {loc}")?;
         }
         if let Some(c) = node.community {
-            let clabel = community_labels.get(&c).map_or("?", std::string::String::as_str);
+            let clabel = community_labels
+                .get(&c)
+                .map_or("?", std::string::String::as_str);
             writeln!(page, "- **Community:** {c} ({clabel})")?;
         }
         writeln!(page)?;

@@ -10,15 +10,13 @@ use crate::SecurityError;
 /// Returns `PathNotFound` for non-existent paths (distinguishable from
 /// `PathTraversal`) and `PathTraversal` for actual escape attempts.
 pub fn safe_path(path: &Path, allowed_root: &Path) -> Result<PathBuf, SecurityError> {
-    let canonical = path
-        .canonicalize()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                SecurityError::PathNotFound(path.to_string_lossy().to_string())
-            } else {
-                SecurityError::PathTraversal(path.to_string_lossy().to_string())
-            }
-        })?;
+    let canonical = path.canonicalize().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            SecurityError::PathNotFound(path.to_string_lossy().to_string())
+        } else {
+            SecurityError::PathTraversal(path.to_string_lossy().to_string())
+        }
+    })?;
     let root = allowed_root
         .canonicalize()
         .map_err(|_| SecurityError::PathTraversal(allowed_root.to_string_lossy().to_string()))?;

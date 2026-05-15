@@ -65,8 +65,7 @@ pub fn export_html(
         let cid = node
             .community
             .or_else(|| node_community.get(node.id.as_str()).copied());
-        let color = cid
-            .map_or("#888888", |c| COMMUNITY_COLORS[c % COMMUNITY_COLORS.len()]);
+        let color = cid.map_or("#888888", |c| COMMUNITY_COLORS[c % COMMUNITY_COLORS.len()]);
         let degree = graph.degree(&node.id);
         // Scale node size by degree
         let size = 8.0 + (degree as f64).sqrt() * 4.0;

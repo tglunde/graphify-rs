@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use super::{
+    RE_GEN_CLASS, RE_GEN_FUNC, RE_GEN_IMPORT, end_line_at, infer_calls, line_of, make_edge,
+    make_file_node, make_node, path_str,
+};
 use graphify_core::confidence::Confidence;
 use graphify_core::id::make_id;
 use graphify_core::model::{ExtractionResult, GraphNode, NodeType};
-use super::{end_line_at, infer_calls, line_of, make_edge, make_file_node, make_node, path_str, RE_GEN_CLASS, RE_GEN_FUNC, RE_GEN_IMPORT};
 
 pub(crate) fn extract_generic(path: &Path, source: &str, _lang: &str) -> ExtractionResult {
     let mut result = ExtractionResult::default();

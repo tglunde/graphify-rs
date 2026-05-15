@@ -19,22 +19,11 @@ use graphify_core::model::{ExtractionResult, GraphEdge, GraphNode, NodeType};
 use tracing::trace;
 use tree_sitter::{Language, Node, Parser};
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Public entry point
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// Try tree-sitter extraction for a supported language.
-/// Returns `None` if the language is not supported by tree-sitter grammars.
 pub fn try_extract(path: &Path, source: &[u8], lang: &str) -> Option<ExtractionResult> {
     let (language, config) = treesitter_config::resolve_language(lang)?;
     extract_with_treesitter(path, source, language, &config, lang)
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Core extraction
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// Extract graph nodes and edges from a single file using tree-sitter.
 fn extract_with_treesitter(
     path: &Path,
     source: &[u8],
@@ -56,10 +45,8 @@ fn extract_with_treesitter(
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
     let mut seen_ids = HashSet::new();
-    // For the call-graph pass we record (caller_nid, body_start_byte, body_end_byte)
     let mut function_bodies: Vec<(String, usize, usize)> = Vec::new();
 
-    // File node
     let file_nid = make_id(&[&str_path]);
     seen_ids.insert(file_nid.clone());
     nodes.push(GraphNode {
@@ -72,24 +59,20 @@ fn extract_with_treesitter(
         extra: HashMap::new(),
     });
 
-    // Walk the AST
-    walk_node(
-        root,
-        source,
-        config,
-        lang,
-        &file_nid,
-        stem,
-        &str_path,
-        &mut nodes,
-        &mut edges,
-        &mut seen_ids,
-        &mut function_bodies,
-        None,
-    );
+    {
+        let mut ctx = WalkContext {
+            lang,
+            file_nid: &file_nid,
+            str_path: &str_path,
+            nodes: &mut nodes,
+            edges: &mut edges,
+            seen_ids: &mut seen_ids,
+            function_bodies: &mut function_bodies,
+        };
+        walk_node(root, source, config, &mut ctx, None);
+    }
 
-    // ---- Call-graph pass ----
-    // Build label → nid mapping for known functions
+    // Call-graph pass: match known function names in function bodies
     let label_to_nid: HashMap<String, String> = nodes
         .iter()
         .filter(|n| matches!(n.node_type, NodeType::Function | NodeType::Method))
@@ -112,18 +95,14 @@ fn extract_with_treesitter(
             if callee_nid == caller_nid {
                 continue;
             }
-            // Heuristic: look for `func_name(` in body, or for Ruby-style no-parens calls
             let has_paren_call = body_lower.contains(&format!("{func_label}("));
             let has_noparen_call = if lang == "ruby" {
-                // Ruby allows `func arg` or `func\n` — check if func_label appears
-                // as a standalone word (not part of a longer identifier)
                 body_lower.find(func_label.as_str()).is_some_and(|pos| {
                     let after = pos + func_label.len();
                     if after >= body_lower.len() {
-                        true // at end of body
+                        true
                     } else {
                         let next_ch = body_lower.as_bytes()[after];
-                        // Must be followed by non-alphanumeric (space, newline, paren, etc.)
                         !next_ch.is_ascii_alphanumeric() && next_ch != b'_'
                     }
                 })
@@ -164,194 +143,110 @@ fn extract_with_treesitter(
     })
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// AST walking
-// ═══════════════════════════════════════════════════════════════════════════
-
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn walk_node(
     node: Node,
     source: &[u8],
     config: &TsConfig,
-    lang: &str,
-    file_nid: &str,
-    stem: &str,
-    str_path: &str,
-    nodes: &mut Vec<GraphNode>,
-    edges: &mut Vec<GraphEdge>,
-    seen_ids: &mut HashSet<String>,
-    function_bodies: &mut Vec<(String, usize, usize)>,
+    ctx: &mut WalkContext,
     parent_class_nid: Option<&str>,
 ) {
     let kind = node.kind();
 
-    // ---- Imports ----
     if config.import_types.contains(kind) {
-        // For Ruby/Elixir, `call` is in multiple type sets.
-        // Only treat specific calls as imports; let other calls recurse normally.
-        if lang == "ruby" && kind == "call" {
+        if ctx.lang == "ruby" && kind == "call" {
             let method_name = node
                 .child_by_field_name("method")
                 .map(|n| node_text(n, source))
                 .unwrap_or_default();
             if method_name == "require" || method_name == "require_relative" {
-                imports::extract_import(node, source, file_nid, str_path, lang, edges, nodes);
+                imports::extract_import(node, source, ctx.file_nid, ctx.str_path, ctx.lang, ctx.edges, ctx.nodes);
                 return;
             }
-            // Not a require call, fall through to normal processing
-        } else if lang == "elixir" && kind == "call" {
+        } else if ctx.lang == "elixir" && kind == "call" {
             let target = node
                 .child_by_field_name(config.name_field)
                 .map(|n| node_text(n, source))
                 .unwrap_or_default();
             if matches!(target.as_str(), "import" | "use" | "require" | "alias") {
-                imports::extract_import(node, source, file_nid, str_path, lang, edges, nodes);
+                imports::extract_import(node, source, ctx.file_nid, ctx.str_path, ctx.lang, ctx.edges, ctx.nodes);
                 return;
             }
-            // Not an import call — fall through to class/function checks
         } else {
-            imports::extract_import(node, source, file_nid, str_path, lang, edges, nodes);
-            return; // Don't recurse into import children
+            imports::extract_import(node, source, ctx.file_nid, ctx.str_path, ctx.lang, ctx.edges, ctx.nodes);
+            return;
         }
     }
 
-    // ---- Classes / Structs / Enums / Traits ----
     if config.class_types.contains(kind) {
-        if lang == "elixir" && kind == "call" {
+        if ctx.lang == "elixir" && kind == "call" {
             let target = node
                 .child_by_field_name(config.name_field)
                 .map(|n| node_text(n, source))
                 .unwrap_or_default();
-            if target != "defmodule" && target != "defprotocol" && target != "defimpl" {
-                // Not a module definition — skip class handling
-            } else {
-                handlers::handle_class_like(
-                    node,
-                    source,
-                    config,
-                    lang,
-                    file_nid,
-                    stem,
-                    str_path,
-                    nodes,
-                    edges,
-                    seen_ids,
-                    function_bodies,
-                );
+            if target == "defmodule" || target == "defprotocol" || target == "defimpl" {
+                handlers::handle_class_like(node, source, config, ctx);
                 return;
             }
         } else {
-        handlers::handle_class_like(
-            node,
-            source,
-            config,
-            lang,
-            file_nid,
-            stem,
-            str_path,
-            nodes,
-            edges,
-            seen_ids,
-            function_bodies,
-        );
-        return;
+            handlers::handle_class_like(node, source, config, ctx);
+            return;
         }
     }
 
-    // ---- Functions / Methods ----
     if config.function_types.contains(kind) {
-        if lang == "elixir" && kind == "call" {
+        if ctx.lang == "elixir" && kind == "call" {
             let target = node
                 .child_by_field_name(config.name_field)
                 .map(|n| node_text(n, source))
                 .unwrap_or_default();
-            if matches!(target.as_str(), "def" | "defp" | "defmacro" | "defmacrop" | "defguard" | "defguardp" | "defdelegate") {
-                handlers::handle_function(
-                    node,
-                    source,
-                    config,
-                    lang,
-                    file_nid,
-                    stem,
-                    str_path,
-                    nodes,
-                    edges,
-                    seen_ids,
-                    function_bodies,
-                    parent_class_nid,
-                );
+            if matches!(
+                target.as_str(),
+                "def" | "defp" | "defmacro" | "defmacrop" | "defguard" | "defguardp" | "defdelegate"
+            ) {
+                handlers::handle_function(node, source, config, ctx, parent_class_nid);
                 return;
             }
-            // Not a function definition — fall through to recursion
         } else {
-        handlers::handle_function(
-            node,
-            source,
-            config,
-            lang,
-            file_nid,
-            stem,
-            str_path,
-            nodes,
-            edges,
-            seen_ids,
-            function_bodies,
-            parent_class_nid,
-        );
-        return;
+            handlers::handle_function(node, source, config, ctx, parent_class_nid);
+            return;
         }
     }
 
-    // ---- Default: recurse into children ----
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        walk_node(
-            child,
-            source,
-            config,
-            lang,
-            file_nid,
-            stem,
-            str_path,
-            nodes,
-            edges,
-            seen_ids,
-            function_bodies,
-            parent_class_nid,
-        );
+        walk_node(child, source, config, ctx, parent_class_nid);
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════════════════════════════════
+pub(crate) struct WalkContext<'a> {
+    pub lang: &'a str,
+    pub file_nid: &'a str,
+    pub str_path: &'a str,
+    pub nodes: &'a mut Vec<GraphNode>,
+    pub edges: &'a mut Vec<GraphEdge>,
+    pub seen_ids: &'a mut HashSet<String>,
+    pub function_bodies: &'a mut Vec<(String, usize, usize)>,
+}
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn node_text(node: Node, source: &[u8]) -> String {
     node.utf8_text(source).unwrap_or("").to_string()
 }
 
-/// Get the name of a definition node via its field name.
 pub(crate) fn get_name(node: Node, source: &[u8], field: &str) -> Option<String> {
     let name_node = node.child_by_field_name(field)?;
-    // For C/C++ declarators, unwrap nested declarators to find the identifier
     let text = unwrap_declarator_name(name_node, source);
     if text.is_empty() { None } else { Some(text) }
 }
 
-/// Recursively unwrap C/C++ declarators (function_declarator, pointer_declarator, etc.)
-/// to find the underlying identifier name.
 pub(crate) fn unwrap_declarator_name(node: Node, source: &[u8]) -> String {
     match node.kind() {
         "function_declarator"
         | "pointer_declarator"
         | "reference_declarator"
         | "parenthesized_declarator" => {
-            // The actual name is in the "declarator" field or first named child
             if let Some(inner) = node.child_by_field_name("declarator") {
                 return unwrap_declarator_name(inner, source);
             }
-            // Fallback: look for an identifier child
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if child.kind() == "identifier" || child.kind() == "field_identifier" {
@@ -361,7 +256,6 @@ pub(crate) fn unwrap_declarator_name(node: Node, source: &[u8]) -> String {
             node_text(node, source)
         }
         "qualified_identifier" | "scoped_identifier" => {
-            // C++ qualified names like `Foo::bar` — use the "name" field
             if let Some(name) = node.child_by_field_name("name") {
                 return node_text(name, source);
             }
@@ -370,7 +264,6 @@ pub(crate) fn unwrap_declarator_name(node: Node, source: &[u8]) -> String {
         _ => node_text(node, source),
     }
 }
-
 
 pub(crate) fn make_edge(
     source_id: &str,
@@ -391,9 +284,3 @@ pub(crate) fn make_edge(
         extra: HashMap::new(),
     }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Tests
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Tests moved to tests/treesitter.rs (integration tests)

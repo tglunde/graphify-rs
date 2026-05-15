@@ -40,7 +40,11 @@ fn is_private_host(host: &str) -> bool {
     }
 
     // Try parsing as IP address (handles IPv4, IPv6, and various representations)
-    if let Ok(ip) = host.trim_start_matches('[').trim_end_matches(']').parse::<std::net::IpAddr>() {
+    if let Ok(ip) = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse::<std::net::IpAddr>()
+    {
         return ip_is_private(&ip);
     }
 
@@ -76,7 +80,11 @@ fn ip_is_private(ip: &std::net::IpAddr) -> bool {
     }
 }
 
-fn is_in_range(ip: &std::net::Ipv4Addr, start: &std::net::Ipv4Addr, end: &std::net::Ipv4Addr) -> bool {
+fn is_in_range(
+    ip: &std::net::Ipv4Addr,
+    start: &std::net::Ipv4Addr,
+    end: &std::net::Ipv4Addr,
+) -> bool {
     let ip_u32 = u32::from(*ip);
     ip_u32 >= u32::from(*start) && ip_u32 <= u32::from(*end)
 }
@@ -89,9 +97,10 @@ fn parse_nonstandard_ipv4(host: &str) -> Option<std::net::Ipv4Addr> {
     }
     // Handle hex representation (e.g., 0x7f000001)
     if let Some(hex) = host.strip_prefix("0x").or_else(|| host.strip_prefix("0X"))
-        && let Ok(num) = u32::from_str_radix(hex, 16) {
-            return Some(std::net::Ipv4Addr::from(num));
-        }
+        && let Ok(num) = u32::from_str_radix(hex, 16)
+    {
+        return Some(std::net::Ipv4Addr::from(num));
+    }
     None
 }
 

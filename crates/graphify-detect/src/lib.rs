@@ -498,7 +498,10 @@ mod tests {
         // Second run: nothing new (all files unchanged)
         let r2 = detect_incremental(root, None);
         let r2_new_count: usize = r2.files.values().map(|v| v.len()).sum();
-        assert_eq!(r2_new_count, 0, "no new/changed files expected on second run");
+        assert_eq!(
+            r2_new_count, 0,
+            "no new/changed files expected on second run"
+        );
 
         // Add a new file
         fs::write(root.join("new_file.ts"), "const x = 1;").unwrap();

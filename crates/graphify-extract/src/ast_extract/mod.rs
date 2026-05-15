@@ -33,7 +33,8 @@ use regex::Regex;
 
 macro_rules! re {
     ($name:ident, $pattern:expr) => {
-        pub(crate) static $name: LazyLock<Regex> = LazyLock::new(|| Regex::new($pattern).expect($pattern));
+        pub(crate) static $name: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new($pattern).expect($pattern));
     };
 }
 

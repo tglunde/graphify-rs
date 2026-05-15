@@ -120,7 +120,10 @@ pub fn cohesion_score(graph: &KnowledgeGraph, community_nodes: &[String]) -> f64
         return 1.0;
     }
 
-    let node_set: HashSet<&str> = community_nodes.iter().map(std::string::String::as_str).collect();
+    let node_set: HashSet<&str> = community_nodes
+        .iter()
+        .map(std::string::String::as_str)
+        .collect();
     let mut actual_edges = 0usize;
 
     // Count edges where both endpoints are in the community
@@ -197,14 +200,13 @@ fn edges_to_community(
     node: &str,
     community: &HashSet<&str>,
 ) -> f64 {
-    adj.get(node)
-        .map_or(0.0, |neighbors| {
-            neighbors
-                .iter()
-                .filter(|(n, _)| community.contains(n.as_str()))
-                .map(|(_, w)| w)
-                .sum()
-        })
+    adj.get(node).map_or(0.0, |neighbors| {
+        neighbors
+            .iter()
+            .filter(|(n, _)| community.contains(n.as_str()))
+            .map(|(_, w)| w)
+            .sum()
+    })
 }
 
 /// Sum of strengths of all nodes in a community.
@@ -432,7 +434,8 @@ fn refinement_phase(
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             {
                 // Only merge if modularity gain is positive
-                let _component_set: HashSet<&str> = component.iter().map(std::string::String::as_str).collect();
+                let _component_set: HashSet<&str> =
+                    component.iter().map(std::string::String::as_str).collect();
                 let target_members: HashSet<&str> = community_members
                     .get(&best_cid)
                     .map(|s| s.iter().map(std::string::String::as_str).collect())
@@ -672,7 +675,10 @@ pub fn cluster_incremental(
         return cluster(graph);
     }
 
-    let changed_set: HashSet<&str> = changed_files.iter().map(std::string::String::as_str).collect();
+    let changed_set: HashSet<&str> = changed_files
+        .iter()
+        .map(std::string::String::as_str)
+        .collect();
 
     // Find affected node IDs (nodes whose source_file is in changed_files)
     let affected_nodes: HashSet<String> = graph

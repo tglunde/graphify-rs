@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use super::{
+    RE_CS_CLASS, RE_CS_METHOD, RE_CS_USING, end_line_at, infer_calls, line_of, make_edge,
+    make_file_node, make_node, path_str,
+};
 use graphify_core::confidence::Confidence;
 use graphify_core::id::make_id;
 use graphify_core::model::{ExtractionResult, GraphNode, NodeType};
-use super::{end_line_at, infer_calls, line_of, make_edge, make_file_node, make_node, path_str, RE_CS_CLASS, RE_CS_METHOD, RE_CS_USING};
 
 pub(crate) fn extract_csharp(path: &Path, source: &str) -> ExtractionResult {
     let mut result = ExtractionResult::default();

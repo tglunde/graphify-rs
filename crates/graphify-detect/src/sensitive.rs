@@ -47,14 +47,8 @@ const SENSITIVE_WORDS: &[&str] = &[
 
 /// Path segments (directory names) that indicate a sensitive location.
 /// Only matches directory names, not arbitrary substrings in the path.
-const SENSITIVE_DIR_SEGMENTS: &[&str] = &[
-    "secrets",
-    "credentials",
-    ".ssh",
-    ".gnupg",
-    ".aws",
-    ".kube",
-];
+const SENSITIVE_DIR_SEGMENTS: &[&str] =
+    &["secrets", "credentials", ".ssh", ".gnupg", ".aws", ".kube"];
 
 /// Check if `word` appears as a complete word in `s`, using `_` and `.` as boundaries.
 fn matches_word(s: &str, word: &str) -> bool {
@@ -63,12 +57,10 @@ fn matches_word(s: &str, word: &str) -> bool {
         let abs_pos = start + pos;
         let after = abs_pos + word.len();
 
-        let boundary_before = abs_pos == 0
-            || s.as_bytes()[abs_pos - 1] == b'_'
-            || s.as_bytes()[abs_pos - 1] == b'.';
-        let boundary_after = after >= s.len()
-            || s.as_bytes()[after] == b'_'
-            || s.as_bytes()[after] == b'.';
+        let boundary_before =
+            abs_pos == 0 || s.as_bytes()[abs_pos - 1] == b'_' || s.as_bytes()[abs_pos - 1] == b'.';
+        let boundary_after =
+            after >= s.len() || s.as_bytes()[after] == b'_' || s.as_bytes()[after] == b'.';
 
         if boundary_before && boundary_after {
             return true;

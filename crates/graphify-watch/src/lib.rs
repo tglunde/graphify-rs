@@ -169,7 +169,8 @@ fn rebuild(
         .map(|(cid, nodes)| {
             let label = nodes
                 .first()
-                .and_then(|id| graph.get_node(id)).map_or_else(|| format!("Community {cid}"), |n| n.label.clone());
+                .and_then(|id| graph.get_node(id))
+                .map_or_else(|| format!("Community {cid}"), |n| n.label.clone());
             (*cid, label)
         })
         .collect();
