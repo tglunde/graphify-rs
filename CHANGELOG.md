@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-05-18
+
+### Added
+
+- **Tree-sitter call-graph extraction** — replace string-matching with AST-based call expression analysis using `collect_callees`/`extract_callee_name`/`extract_name_from_callee`, supporting `identifier`, `attribute` (Python `self.x()`), `field_expression`/`member_expression` (Rust/JS `obj.x()`), `scoped_identifier` (Rust `Module::x()`), `selector_expression` (Go `pkg.Func()`)
+- **Cross-file call resolution** — `resolve_cross_file_calls` derives "calls" edges from "uses" edges (import resolution), filtered to Function/Method source nodes only
+- **MCP pagination** — `get_community` and `get_neighbors` tools now accept `limit`/`offset` parameters (default 50/0), response includes `total_*`, `returned` metadata
+- **Elixir dispatch refactor** — unified 3 duplicate Elixir check blocks into `classify_elixir_call` helper (`ElixirCallKind` enum)
+
+### Fixed
+
+- **Regex call-graph false positives** — `v.get(0)` no longer matches `get()` function; dot-prefixed calls filtered via byte-position check
+- **Production `unwrap()` eliminated** — `graphml.rs` (14 `.unwrap()` → `?`), `cypher.rs` (`ids.pop().unwrap()` → `if let Some`)
+- **`resolve_cross_file_calls` scope** — changed from `pub fn` to `fn`; added Function/Method filter to prevent Struct→Struct "calls" edges
+
+### Changed
+
+- Split `html.rs` template functions into `html_templates.rs`
+- MCP response field renames: `neighbor_count` → `total_neighbors`, `member_count` → `total_members`
+
 ## [0.5.0] - 2025-05-15
 
 ### Breaking Changes
