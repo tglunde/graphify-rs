@@ -912,7 +912,12 @@ fn cross_file_calls_derived_from_uses_edges() {
         .filter(|e| e.relation == "calls")
         .collect();
 
-    assert_eq!(calls_edges.len(), 1, "expected 1 calls edge, got {}", calls_edges.len());
+    assert_eq!(
+        calls_edges.len(),
+        1,
+        "expected 1 calls edge, got {}",
+        calls_edges.len()
+    );
     assert_eq!(calls_edges[0].source, "run");
     assert_eq!(calls_edges[0].target, "init");
     assert_eq!(calls_edges[0].confidence, Confidence::Inferred);
@@ -944,7 +949,10 @@ fn cross_file_calls_skips_non_function_source() {
         .filter(|e| e.relation == "calls")
         .collect();
 
-    assert!(calls_edges.is_empty(), "Struct→Struct uses should not produce calls edge");
+    assert!(
+        calls_edges.is_empty(),
+        "Struct→Struct uses should not produce calls edge"
+    );
 }
 
 #[test]
@@ -979,18 +987,23 @@ fn cross_file_calls_no_duplicate_with_existing() {
         .filter(|e| e.relation == "calls")
         .collect();
 
-    assert_eq!(calls_edges.len(), 1, "should not duplicate existing calls edge");
+    assert_eq!(
+        calls_edges.len(),
+        1,
+        "should not duplicate existing calls edge"
+    );
 }
 
 #[test]
 fn cross_file_calls_no_edges_without_uses() {
     let mut result = ExtractionResult {
-        nodes: vec![
-            make_test_node("run", "run()", "src/main.rs", NodeType::Function),
-        ],
-        edges: vec![
-            make_test_edge("file_main", "run", "defines", "src/main.rs"),
-        ],
+        nodes: vec![make_test_node(
+            "run",
+            "run()",
+            "src/main.rs",
+            NodeType::Function,
+        )],
+        edges: vec![make_test_edge("file_main", "run", "defines", "src/main.rs")],
         hyperedges: vec![],
     };
 
@@ -1002,5 +1015,8 @@ fn cross_file_calls_no_edges_without_uses() {
         .filter(|e| e.relation == "calls")
         .collect();
 
-    assert!(calls_edges.is_empty(), "should not create calls edges without uses edges");
+    assert!(
+        calls_edges.is_empty(),
+        "should not create calls edges without uses edges"
+    );
 }

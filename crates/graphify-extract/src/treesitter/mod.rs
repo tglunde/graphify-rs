@@ -120,17 +120,15 @@ fn extract_with_treesitter(
                 if callee_nid == caller_nid {
                     continue;
                 }
-                let found = body_lower
-                    .find(func_label.as_str())
-                    .is_some_and(|pos| {
-                        let after = pos + func_label.len();
-                        if after >= body_lower.len() {
-                            true
-                        } else {
-                            let next_ch = body_lower.as_bytes()[after];
-                            !next_ch.is_ascii_alphanumeric() && next_ch != b'_'
-                        }
-                    });
+                let found = body_lower.find(func_label.as_str()).is_some_and(|pos| {
+                    let after = pos + func_label.len();
+                    if after >= body_lower.len() {
+                        true
+                    } else {
+                        let next_ch = body_lower.as_bytes()[after];
+                        !next_ch.is_ascii_alphanumeric() && next_ch != b'_'
+                    }
+                });
                 if found {
                     let key = (caller_nid.clone(), callee_nid.clone());
                     if seen_calls.insert(key) {

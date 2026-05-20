@@ -791,7 +791,12 @@ fn caller() {
         .iter()
         .filter(|e| e.relation == "calls")
         .collect();
-    assert_eq!(call_edges.len(), 1, "should have exactly 1 call edge (caller->target), got {:?}", call_edges);
+    assert_eq!(
+        call_edges.len(),
+        1,
+        "should have exactly 1 call edge (caller->target), got {:?}",
+        call_edges
+    );
     assert_eq!(call_edges[0].target, make_id(&["test.rs", "target"]));
 }
 
@@ -830,8 +835,15 @@ class Service:
         .iter()
         .filter(|e| e.relation == "calls")
         .collect();
-    assert_eq!(call_edges.len(), 1, "should detect exactly 1 call: .process() calls process");
-    assert_eq!(call_edges[0].target, make_id(&["svc.py", "Service", "process"]));
+    assert_eq!(
+        call_edges.len(),
+        1,
+        "should detect exactly 1 call: .process() calls process"
+    );
+    assert_eq!(
+        call_edges[0].target,
+        make_id(&["svc.py", "Service", "process"])
+    );
 }
 
 #[test]

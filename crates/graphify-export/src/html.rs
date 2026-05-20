@@ -217,7 +217,6 @@ fn prune_nodes(
     included
 }
 
-
 /// Export a split HTML visualization into `output_dir/html/`.
 ///
 /// Generates:
