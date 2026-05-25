@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-05-24
+
+### Added
+
+- **`serve` auto-build** — `graphify-rs serve` now automatically runs a fast AST-only build if the specified `--graph` file does not exist, making it a zero-config entry point for MCP server setup
+
 ## [0.5.1] - 2026-05-18
 
 ### Added
@@ -216,6 +222,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI with 21 subcommands via clap derive
 
 [0.5.0]: https://github.com/TtTRz/graphify-rs/compare/v0.4.5...v0.5.0
+[0.5.2]: https://github.com/TtTRz/graphify-rs/compare/v0.5.1...v0.5.2
 [0.4.5]: https://github.com/TtTRz/graphify-rs/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/TtTRz/graphify-rs/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/TtTRz/graphify-rs/compare/v0.4.2...v0.4.3

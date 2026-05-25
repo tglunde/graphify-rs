@@ -199,6 +199,8 @@ graphify-rs watch --path src --output my-graph
 
 Start the MCP (Model Context Protocol) server over JSON-RPC 2.0 (stdio). Provides 15 tools that AI agents can call directly.
 
+If the specified graph file does not exist, `serve` automatically runs a fast AST-only build (`--no-llm --code-only --format json`) on the current directory before starting the server. This means `graphify-rs serve` works as a zero-config entry point — no manual `build` step required.
+
 #### Parameters
 
 | Flag | Type | Default | Description |

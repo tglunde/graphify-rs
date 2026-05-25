@@ -209,7 +209,7 @@ Code changes trigger AST re-extraction + rebuild automatically (no LLM needed). 
 
 ## For MCP server
 
-Start a stdio MCP server exposing 15 query tools:
+Start a stdio MCP server exposing 15 query tools. If the graph file does not exist, it is auto-built from the current directory (AST-only, no LLM):
 
 ```bash
 graphify-rs serve --graph graphify-out/graph.json

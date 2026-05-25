@@ -199,6 +199,8 @@ graphify-rs watch --path src --output my-graph
 
 启动 MCP（Model Context Protocol）服务器，通过 JSON-RPC 2.0（stdio）提供服务。提供 15 个 AI 智能体可直接调用的工具。
 
+如果指定的图谱文件不存在，`serve` 会自动对当前目录执行快速 AST-only 构建（`--no-llm --code-only --format json`）后再启动服务器。这意味着 `graphify-rs serve` 可以作为零配置入口——无需手动执行 `build` 步骤。
+
 #### 参数
 
 | 参数 | 类型 | 默认值 | 说明 |

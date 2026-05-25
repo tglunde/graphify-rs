@@ -404,7 +404,30 @@ async fn main() -> Result<()> {
             println!("Saved to {}", out.display());
         }
         Commands::Serve { graph } => {
-            graphify_serve::start_server(Path::new(&graph)).await?;
+            let graph_path = Path::new(&graph);
+            if !graph_path.exists() {
+                tracing::info!("{} not found, running auto-build...", graph_path.display());
+                let output_dir = graph_path
+                    .parent()
+                    .unwrap_or(Path::new("graphify-out"))
+                    .to_string_lossy()
+                    .to_string();
+                cmd_build::cmd_build(
+                    ".",
+                    &output_dir,
+                    true,
+                    true,
+                    false,
+                    &["json".to_string()],
+                    Verbosity::Quiet,
+                    None,
+                    None,
+                    None,
+                )
+                .await
+                .context("Auto-build failed")?;
+            }
+            graphify_serve::start_server(graph_path).await?;
         }
         Commands::Watch { path, output } => {
             graphify_watch::watch_directory(Path::new(&path), Path::new(&output)).await?;
