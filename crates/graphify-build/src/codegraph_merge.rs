@@ -1,11 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use anyhow::Result;
+use graphify_core::error::Result;
 use graphify_core::graph::KnowledgeGraph;
 use graphify_core::model::NodeType;
 use rusqlite::Connection;
-use tracing::warn;
+use tracing::{debug, warn};
 
 /// CodeGraph node kind -> graphify-rs NodeType.
 fn map_node_kind(codegraph_kind: &str) -> Option<NodeType> {
@@ -97,12 +97,16 @@ pub fn merge_codegraph_edges(kg: &mut KnowledgeGraph, project_root: &Path) -> Re
                 for r in iter {
                     match r {
                         Ok((id, kind, name, file_path)) => {
-                            if let Some(nt) = map_node_kind(&kind) {
-                                let fp = normalize_path(&file_path);
-                                let key = (fp, name, nt);
-                                cg_id_to_key.insert(id.clone(), key.clone());
-                                cg_nodes.entry(key).or_default().push(id);
-                            }
+                            let nt = map_node_kind(&kind).unwrap_or_else(|| {
+                                tracing::debug!(
+                                    "unknown CodeGraph node kind '{kind}', falling back to Variable"
+                                );
+                                NodeType::Variable
+                            });
+                            let fp = normalize_path(&file_path);
+                            let key = (fp, name, nt);
+                            cg_id_to_key.insert(id.clone(), key.clone());
+                            cg_nodes.entry(key).or_default().push(id);
                         }
                         Err(e) => {
                             warn!("skipping CodeGraph node row: {e}");
@@ -173,6 +177,9 @@ pub fn merge_codegraph_edges(kg: &mut KnowledgeGraph, project_root: &Path) -> Re
 
                             // Map edge kind
                             let Some(relation) = map_edge_kind(&cg_kind) else {
+                                tracing::debug!(
+                                    "skipping CodeGraph edge with unrecognized kind '{cg_kind}'"
+                                );
                                 skipped_kind += 1;
                                 continue;
                             };
@@ -200,12 +207,29 @@ pub fn merge_codegraph_edges(kg: &mut KnowledgeGraph, project_root: &Path) -> Re
                             let gf_src = &src_gf_ids[0];
                             let gf_tgt = &tgt_gf_ids[0];
 
+                            if src_gf_ids.len() > 1 {
+                                debug!(
+                                    "ambiguous CodeGraph source: key {:?} maps to {} graphify nodes, using {}",
+                                    src_key,
+                                    src_gf_ids.len(),
+                                    gf_src
+                                );
+                            }
+                            if tgt_gf_ids.len() > 1 {
+                                debug!(
+                                    "ambiguous CodeGraph target: key {:?} maps to {} graphify nodes, using {}",
+                                    tgt_key,
+                                    tgt_gf_ids.len(),
+                                    gf_tgt
+                                );
+                            }
+
                             // Dedup check
-                            if existing_edges.contains(&(
-                                gf_src.clone(),
-                                gf_tgt.clone(),
-                                relation.to_string(),
-                            )) {
+                            let key = (gf_src.as_str(), gf_tgt.as_str(), relation);
+                            if existing_edges
+                                .iter()
+                                .any(|(s, t, r)| s == key.0 && t == key.1 && r == key.2)
+                            {
                                 skipped_dedup += 1;
                                 continue;
                             }
@@ -213,7 +237,7 @@ pub fn merge_codegraph_edges(kg: &mut KnowledgeGraph, project_root: &Path) -> Re
                             // Build extra metadata
                             let mut extra = HashMap::new();
                             extra.insert(
-                                "source".to_string(),
+                                "merge_source".to_string(),
                                 serde_json::Value::String("codegraph".to_string()),
                             );
                             extra.insert(
@@ -262,13 +286,11 @@ pub fn merge_codegraph_edges(kg: &mut KnowledgeGraph, project_root: &Path) -> Re
         }
     }
 
+    let total_skipped =
+        skipped_contains + skipped_kind + skipped_no_source + skipped_no_target + skipped_dedup;
+    let unmatched = skipped_no_source + skipped_no_target;
     tracing::info!(
-        "CodeGraph merge: {merged} edges merged, \
-         {skipped_contains} contains skipped, \
-         {skipped_kind} unsupported kind skipped, \
-         {skipped_no_source} no-source skipped, \
-         {skipped_no_target} no-target skipped, \
-         {skipped_dedup} duplicates skipped",
+        "CodeGraph: merged {merged} edges ({total_skipped} skipped: {unmatched} unmatched, {skipped_contains} contains, {skipped_dedup} duplicate, {skipped_kind} unsupported kind)",
     );
 
     Ok(merged)
@@ -540,7 +562,7 @@ mod tests {
         assert_eq!(edges[0].source, "gf_foo");
         assert_eq!(edges[0].target, "gf_bar");
         assert_eq!(
-            edges[0].extra.get("source").unwrap(),
+            edges[0].extra.get("merge_source").unwrap(),
             &serde_json::Value::String("codegraph".to_string())
         );
         assert_eq!(
