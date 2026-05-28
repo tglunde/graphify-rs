@@ -64,6 +64,16 @@ pub async fn cmd_build(
         graph.edge_count().to_string().bold()
     );
 
+    // Merge CodeGraph edges if .codegraph/codegraph.db exists
+    let cg_merged = graphify_build::merge_codegraph_edges(&mut graph, &root).unwrap_or(0);
+    if cg_merged > 0 {
+        info_print!(
+            verb,
+            "  CodeGraph: merged {} additional edges",
+            cg_merged.to_string().bold()
+        );
+    }
+
     let ClusterResult {
         communities,
         cohesion,
