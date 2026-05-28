@@ -28,6 +28,8 @@ fn map_node_kind(codegraph_kind: &str) -> Option<NodeType> {
 }
 
 /// Normalize a file path to POSIX style: forward slashes, no leading `./`.
+/// Note: does not resolve `..` segments — assumes both tools produce
+/// consistently relative paths from the project root.
 fn normalize_path(path: &str) -> String {
     let p = path.replace('\\', "/");
     let p = p.strip_prefix("./").unwrap_or(&p);
@@ -169,18 +171,15 @@ pub fn merge_codegraph_edges(kg: &mut KnowledgeGraph, project_root: &Path) -> Re
                 for r in iter {
                     match r {
                         Ok((cg_src_id, cg_tgt_id, cg_kind, provenance)) => {
-                            // Skip contains edges
-                            if cg_kind == "contains" {
-                                skipped_contains += 1;
-                                continue;
-                            }
-
-                            // Map edge kind
                             let Some(relation) = map_edge_kind(&cg_kind) else {
-                                tracing::debug!(
-                                    "skipping CodeGraph edge with unrecognized kind '{cg_kind}'"
-                                );
-                                skipped_kind += 1;
+                                if cg_kind == "contains" {
+                                    skipped_contains += 1;
+                                } else {
+                                    tracing::debug!(
+                                        "skipping CodeGraph edge with unrecognized kind '{cg_kind}'"
+                                    );
+                                    skipped_kind += 1;
+                                }
                                 continue;
                             };
 
