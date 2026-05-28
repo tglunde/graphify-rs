@@ -3,6 +3,10 @@
 //! Takes [`ExtractionResult`]s from multiple files and assembles them into a
 //! single [`KnowledgeGraph`], skipping dangling edges.
 
+mod codegraph_merge;
+
+pub use codegraph_merge::merge_codegraph_edges;
+
 use std::collections::HashSet;
 
 use tracing::debug;
