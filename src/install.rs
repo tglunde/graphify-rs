@@ -16,63 +16,63 @@ const PLATFORMS: &[(&str, PlatformConfig)] = &[
     (
         "claude",
         PlatformConfig {
-            skill_dst: ".claude/skills/graphify/SKILL.md",
+            skill_dst: ".claude/skills/graphify-rs/SKILL.md",
             register_claude_md: true,
         },
     ),
     (
         "codex",
         PlatformConfig {
-            skill_dst: ".agents/skills/graphify/SKILL.md",
+            skill_dst: ".agents/skills/graphify-rs/SKILL.md",
             register_claude_md: false,
         },
     ),
     (
         "opencode",
         PlatformConfig {
-            skill_dst: ".config/opencode/skills/graphify/SKILL.md",
+            skill_dst: ".config/opencode/skills/graphify-rs/SKILL.md",
             register_claude_md: false,
         },
     ),
     (
         "claw",
         PlatformConfig {
-            skill_dst: ".claw/skills/graphify/SKILL.md",
+            skill_dst: ".claw/skills/graphify-rs/SKILL.md",
             register_claude_md: false,
         },
     ),
     (
         "droid",
         PlatformConfig {
-            skill_dst: ".factory/skills/graphify/SKILL.md",
+            skill_dst: ".factory/skills/graphify-rs/SKILL.md",
             register_claude_md: false,
         },
     ),
     (
         "trae",
         PlatformConfig {
-            skill_dst: ".trae/skills/graphify/SKILL.md",
+            skill_dst: ".trae/skills/graphify-rs/SKILL.md",
             register_claude_md: false,
         },
     ),
     (
         "trae-cn",
         PlatformConfig {
-            skill_dst: ".trae-cn/skills/graphify/SKILL.md",
+            skill_dst: ".trae-cn/skills/graphify-rs/SKILL.md",
             register_claude_md: false,
         },
     ),
     (
         "codebuddy",
         PlatformConfig {
-            skill_dst: ".codebuddy/skills/graphify/SKILL.md",
+            skill_dst: ".codebuddy/skills/graphify-rs/SKILL.md",
             register_claude_md: false,
         },
     ),
     (
         "windows",
         PlatformConfig {
-            skill_dst: ".claude/skills/graphify/SKILL.md",
+            skill_dst: ".claude/skills/graphify-rs/SKILL.md",
             register_claude_md: true,
         },
     ),
@@ -80,8 +80,8 @@ const PLATFORMS: &[(&str, PlatformConfig)] = &[
 
 const SKILL_REGISTRATION: &str = r#"
 # graphify
-- **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
-When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` before doing anything else.
+- **graphify-rs** (`~/.claude/skills/graphify-rs/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify-rs`
+When the user types `/graphify-rs`, invoke the Skill tool with `skill: "graphify-rs"` before doing anything else.
 "#;
 
 const CLAUDE_MD_SECTION: &str = r"## graphify
@@ -174,7 +174,7 @@ pub fn install_skill(platform: &str) -> Result<()> {
     }
 
     println!("\n  Installed graphify skill for '{platform}'.");
-    println!("  Use `/graphify` in your AI assistant to trigger the skill.");
+    println!("  Use `/graphify-rs` in your AI assistant to trigger the skill.");
 
     Ok(())
 }
